@@ -87,7 +87,7 @@ function dezombifyParty()
 	local genders = { "female", "female", "male", "male" }
 	local names = { "Sylyna", "Yennica", "Contar", "Sancsaron" }
 
-	for c in fromChampions():where(function(c) return ((not c:getEnabled()) and (c:getStatMax("health") == 0)); end):toIterator()
+	for c in fromChampions():where(function(c) return ((not c:getEnabled()) and (c:getStatMax("health") == 0)); end):toIterator() do
 		c:setStatMax("health", 25)
 		c:setStatMax("energy", 10)
 		c:setPortrait("assets/textures/portraits/" .. portraits[i] .. ".tga")

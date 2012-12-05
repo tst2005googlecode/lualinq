@@ -10,7 +10,6 @@ ChangeLog
 	o GrimQ: new: reverseFacing, getChampionFromOrdinal, strformat, strsplit
 	o GrimQ: added *optional* integrations with JKos framework hooks
 	o GrimQ: added AUTO_ALL_SECRETS options to shortcut all secrets to be auto
-	o GrimQ: 
 
 
 27-Nov-2012: Version 1.1

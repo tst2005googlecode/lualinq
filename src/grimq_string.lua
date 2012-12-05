@@ -31,28 +31,6 @@ function strformat(text, ...)
 	return text
 end
 
--- from http://snippets.luacode.org/?p=snippets/Split_a_string_into_a_list_5
-function strsplit(s,re)
-	local i1 = 1
-	local ls = {}
-	
-	if not re then re = '%s+' end
-	if re == '' then return {s} end
-	while true do
-		local i2,i3 = s:find(re,i1)
-		if not i2 then
-			local last = s:sub(i1)
-			if last ~= '' then table.insert(ls,last) end
-			if #ls == 1 and ls[1] == '' then
-				return {}
-			else
-				return ls
-			end
-		end
-		table.insert(ls,s:sub(i1,i2-1))
-		i1 = i3+1
-	end
-end
 
 -- see http://lua-users.org/wiki/StringRecipes
 function strstarts(String,Start)

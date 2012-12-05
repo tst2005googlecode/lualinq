@@ -54,31 +54,25 @@ function _initializeAutoScript(ntt)
 		ntt:autoexec();
 	end
 	
-	local hooks = from(ntt):where(match("key", "^autohook_")):where(function(fn) return (type(fn.value) == "function"); end)
-	
-	for hook in hooks:toIterator() do
-		local splits = strsplit(hooks.key, "__")
-		local target = splits[2]
-		local hookname = splits[3]
-		
-		if (target == nil or hookname == nil) then
-			print("Invalid auto-hook ".. ntt.name .. "." .. hookname .. " -> name must be autohook__<target>__<hookname>.")
-		elseif (fw == nil or (not USE_JKOS_FRAMEWORK)) then
-			print("Can't install autohook: ".. ntt.name .. "." .. hookname .. " -> JKos framework not found or USE_JKOS_FRAMEWORK is false.")
-		else
-			fw.addHooks(target, ntt.name, { [hookname] = hook.value } )
+	if (ntt.autohook ~= nil) then
+		if (fw == nil or (not USE_JKOS_FRAMEWORK)) then
+			print("Can't install autohooks in ".. ntt.id .. " -> JKos framework not found or USE_JKOS_FRAMEWORK is false.")
+			return
+		end
+
+		for hooktable in from(ntt.autohook):toIterator() do
+			local target = hooktable.key
+			local hooks = from(hooktable.value):where(function(fn) return (type(fn.value) == "function"); end)
+			
+			for hook in hooks:toIterator() do
+				local hookname = hook.key
+				print("Adding hook for: ".. ntt.id .. "." .. hookname .. " ...")
+				fw.addHooks(target, ntt.id .. "_" .. target .. "_" .. hookname, { [hookname] = hook.value } )
+			end
 		end
 	end
 end
 
-
-function _jkosAutoStart()
-	timers:setLevels(MAXLEVEL) -- change this to amount of levels in your dungeon.
-	fw.debug.enabled = DEBUG_MODE
-	fwInit:close() --must be called
-
-	_activateAutos()
-end
 
 
 

@@ -77,12 +77,7 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 			local destroyed = false
 			
 			if (self.container ~= nil) then
-				if (tryhard == true) then
-					self.champion:removeItem(self.slot)
-					destroyed = true
-				end
-				self.container:removeItem(self.item)
-				destroyed = true
+				destroyed = false
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
 				destroyed = true
@@ -94,19 +89,18 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 		end,
 		
 		replace = function(self, newitem, tryhard)
+			local done = false
 			if (self.container ~= nil) then
-				self.container:removeItem(self.item)
-				self.container:addItem(newitem)
+				done = false
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
 				self.champion:insertItem(self.slot, newitem)
+				done = true
 			elseif (ismouse) then
 				setMouseItem(nil)
 				setMouseItem(newitem)
-			else 
-				self.item:destroy()
-				newitem:destroy()
 			end
+			return done
 		end
 	}
 end
