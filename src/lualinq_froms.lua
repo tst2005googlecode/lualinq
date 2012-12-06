@@ -2,54 +2,6 @@
 -- GENERATORS
 -- ============================================================
 
--- Creates a linq data structure from an array without copying the data for efficiency
-function fromArrayInstance(collection)
-	local self = { }
-	
-	self.classid_71cd970f_a742_4316_938d_1998df001335 = 1
-	
-	self.m_Data = collection
-	
-	self.concat = _concat
-	self.select = _select
-	self.selectMany = _selectMany
-	self.where = _where
-	self.whereIndex = _whereIndex
-	self.take = _take
-	self.skip = _skip
-	self.zip = _zip
-	
-	self.distinct = _distinct 
-	self.union = _union
-	self.except = _except
-	self.intersection = _intersection
-
-	self.first = _first
-	self.last = _last
-	self.min = _min
-	self.max = _max
-	self.random = _random
-
-	self.any = _any
-	self.all = _all
-	self.contains = _contains
-
-	self.count = _count
-	self.sum = _sum
-	self.average = _average
-
-	self.map = _map
-	self.foreach = _foreach
-	self.xmap = _xmap
-
-
-	self.toArray = _toArray
-	self.toDictionary = _toDictionary
-	self.toIterator = _toIterator
-	
-	return self
-end
-
 -- Tries to autodetect input type and uses the appropriate from method
 function from(auto)
 	if (auto == nil) then
@@ -70,6 +22,11 @@ function from(auto)
 	return fromNothing()
 end
 
+-- Creates a linq data structure from an array without copying the data for efficiency
+function fromArrayInstance(collection)
+	return _new_lualinq("fromArrayInstance", collection)
+end
+
 -- Creates a linq data structure from an array copying the data first (so that changes in the original
 -- table do not reflect here)
 function fromArray(array)
@@ -77,7 +34,7 @@ function fromArray(array)
 	for k,v in ipairs(array) do
 		table.insert(collection, v)
 	end
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromArray", collection)
 end
 
 -- Creates a linq data structure from a dictionary (table with non-consecutive-integer keys)
@@ -92,7 +49,7 @@ function fromDictionary(dictionary)
 		table.insert(collection, kvp)
 	end
 	
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromDictionary", collection)
 end
 
 -- Creates a linq data structure from an iterator returning single items
@@ -103,7 +60,7 @@ function fromIterator(iterator)
 		table.insert(collection, s)
 	end
 	
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromIterator", collection)
 end
 
 -- Creates a linq data structure from an array of iterators each returning single items
@@ -116,11 +73,11 @@ function fromIteratorsArray(iteratorArray)
 		end
 	end
 	
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromIteratorsArray", collection)
 end
 
 -- Creates an empty linq data structure
 function fromNothing()
-	return fromArrayInstance { }
+	return _new_lualinq("fromNothing", { } )
 end
 

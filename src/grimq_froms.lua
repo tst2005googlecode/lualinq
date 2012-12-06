@@ -77,6 +77,7 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 			local destroyed = false
 			
 			if (self.container ~= nil) then
+				logi("itemObject couldn't be destroyed")
 				destroyed = false
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
@@ -91,6 +92,7 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 		replace = function(self, newitem, tryhard)
 			local done = false
 			if (self.container ~= nil) then
+				logi("itemObject couldn't be replaced")
 				done = false
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)

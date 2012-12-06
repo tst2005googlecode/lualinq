@@ -13,7 +13,7 @@ function _concat(self, otherlinq)
 		table.insert(result, value)
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":concat", result)
 end
 
 -- Replaces items with those returned by the selector function or properties with name selector
@@ -36,7 +36,7 @@ function _select(self, selector)
 		end
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":select", result)
 end
 
 
@@ -55,7 +55,7 @@ function _selectMany(self, selector)
 		end
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":selectMany", result)
 end
 
 -- Returns a linq data structure where only items for whose the predicate has returned true are included
@@ -76,7 +76,7 @@ function _where(self, predicate, refvalue)
 		end	
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":where", result)
 end
 
 -- Returns a linq data structure where only items for whose the predicate has returned true are included, indexed version
@@ -89,7 +89,7 @@ function _whereIndex(self, predicate)
 		end
 	end	
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":whereIndex", result)
 end
 
 -- Return a linq data structure with at most the first howmany elements
@@ -116,7 +116,7 @@ function _zip(self, otherlinq, joiner)
 		result[i] = joiner(self.m_Data[i], otherlinq.m_Data[i]);
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":zip", result)
 end
 
 -- Returns only distinct items, using an optional comparator
@@ -139,7 +139,7 @@ function _distinct(self, comparator)
 		end
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":distinct", result)
 end
 
 -- Returns the union of two collections, using an optional comparator

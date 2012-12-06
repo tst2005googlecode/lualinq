@@ -22,21 +22,78 @@ AUTO_ALL_SECRETS = true
 -- integrate with jkos framework. Read docs before enabling it.
 USE_JKOS_FRAMEWORK = false
 
--- debug mode
-DEBUG_MODE = false
+-- how much log information is printed: 3 => verbose, 2 => info, 1 => only warning and errors, 0 => only errors, -1 => silent
+LOG_LEVEL = 0
+
+-- prefix for the printed logs
+LOG_PREFIX = "GrimQ: "
 
 
 ---------------------------------------------------------------------------
 -- IMPLEMENTATION BELOW, DO NOT CHANGE
 ---------------------------------------------------------------------------
 
+VERSION_SUFFIX = ""
+-- ============================================================
+-- DEBUG TRACER
+-- ============================================================
+
+LIB_VERSION_TEXT = "1.2"
+LIB_VERSION = 120
+
+function _log(level, prefix, text)
+	if (level <= LOG_LEVEL) then
+		print(prefix .. LOG_PREFIX .. txt)
+	end
+end
+
+function logq(self, method)
+	if (LOG_LEVEL >= 3) then
+		local items = #self.m_Data
+		local dumpdata = "{ "
+		
+		for i = 1, 3 do
+			if (i <= items) then
+				if (i ~= 1) then
+					dumpdata = dumpdata + ", "
+				end
+				dumpdata = dumpdata + tostring(self[i])
+			end
+		end
+		
+		if (items > 3) then
+			dumpdata = dumpdata + ", ... }"
+		else
+			dumpdata = dumpdata + " }"
+		end
+	
+		print("[..]" .. LOG_PREFIX .. "after " .. method .. " => " .. items .. " items : " .. dumpdata)
+	end
+end
+
+function logv(txt)
+	log(3, "[..] ", txt)
+end
+
+function logi(txt)
+	log(2, "[ii] ", txt)
+end
+
+function logw(txt)
+	log(1, "[W?] ", txt)
+end
+
+function loge(txt)
+	log(0, "[E!] ", txt)
+end
+
 
 -- ============================================================
--- GENERATORS
+-- CONSTRUCTOR
 -- ============================================================
 
--- Creates a linq data structure from an array without copying the data for efficiency
-function fromArrayInstance(collection)
+-- [private] Creates a linq data structure from an array without copying the data for efficiency
+function _new_lualinq(method, collection)
 	local self = { }
 	
 	self.classid_71cd970f_a742_4316_938d_1998df001335 = 1
@@ -75,13 +132,17 @@ function fromArrayInstance(collection)
 	self.foreach = _foreach
 	self.xmap = _xmap
 
-
 	self.toArray = _toArray
 	self.toDictionary = _toDictionary
 	self.toIterator = _toIterator
 	
+	logq(self, "from")
+
 	return self
 end
+-- ============================================================
+-- GENERATORS
+-- ============================================================
 
 -- Tries to autodetect input type and uses the appropriate from method
 function from(auto)
@@ -103,6 +164,11 @@ function from(auto)
 	return fromNothing()
 end
 
+-- Creates a linq data structure from an array without copying the data for efficiency
+function fromArrayInstance(collection)
+	return _new_lualinq("fromArrayInstance", collection)
+end
+
 -- Creates a linq data structure from an array copying the data first (so that changes in the original
 -- table do not reflect here)
 function fromArray(array)
@@ -110,7 +176,7 @@ function fromArray(array)
 	for k,v in ipairs(array) do
 		table.insert(collection, v)
 	end
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromArray", collection)
 end
 
 -- Creates a linq data structure from a dictionary (table with non-consecutive-integer keys)
@@ -125,7 +191,7 @@ function fromDictionary(dictionary)
 		table.insert(collection, kvp)
 	end
 	
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromDictionary", collection)
 end
 
 -- Creates a linq data structure from an iterator returning single items
@@ -136,7 +202,7 @@ function fromIterator(iterator)
 		table.insert(collection, s)
 	end
 	
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromIterator", collection)
 end
 
 -- Creates a linq data structure from an array of iterators each returning single items
@@ -149,12 +215,12 @@ function fromIteratorsArray(iteratorArray)
 		end
 	end
 	
-	return fromArrayInstance(collection)
+	return _new_lualinq("fromIteratorsArray", collection)
 end
 
 -- Creates an empty linq data structure
 function fromNothing()
-	return fromArrayInstance { }
+	return _new_lualinq("fromNothing", { } )
 end
 
 -- ============================================================
@@ -172,7 +238,7 @@ function _concat(self, otherlinq)
 		table.insert(result, value)
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":concat", result)
 end
 
 -- Replaces items with those returned by the selector function or properties with name selector
@@ -195,7 +261,7 @@ function _select(self, selector)
 		end
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":select", result)
 end
 
 
@@ -214,7 +280,7 @@ function _selectMany(self, selector)
 		end
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":selectMany", result)
 end
 
 -- Returns a linq data structure where only items for whose the predicate has returned true are included
@@ -235,7 +301,7 @@ function _where(self, predicate, refvalue)
 		end	
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":where", result)
 end
 
 -- Returns a linq data structure where only items for whose the predicate has returned true are included, indexed version
@@ -248,7 +314,7 @@ function _whereIndex(self, predicate)
 		end
 	end	
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":whereIndex", result)
 end
 
 -- Return a linq data structure with at most the first howmany elements
@@ -275,7 +341,7 @@ function _zip(self, otherlinq, joiner)
 		result[i] = joiner(self.m_Data[i], otherlinq.m_Data[i]);
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":zip", result)
 end
 
 -- Returns only distinct items, using an optional comparator
@@ -298,7 +364,7 @@ function _distinct(self, comparator)
 		end
 	end
 	
-	return fromArrayInstance(result)
+	return _new_lualinq(":distinct", result)
 end
 
 -- Returns the union of two collections, using an optional comparator
@@ -613,6 +679,7 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 			local destroyed = false
 			
 			if (self.container ~= nil) then
+				logi("itemObject couldn't be destroyed")
 				destroyed = false
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
@@ -627,6 +694,7 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 		replace = function(self, newitem, tryhard)
 			local done = false
 			if (self.container ~= nil) then
+				logi("itemObject couldn't be replaced")
 				done = false
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
@@ -887,11 +955,16 @@ function moveItemsFromTileToAlcove(alcove)
 		end)
 end
 
+g_ToorumMode = nil
 function isToorumMode()
-   local rangerDetected = fromChampions():where(function(c) return (c:getClass() == "Ranger"); end):count()
-   local zombieDetected = fromChampions():where(function(c) return ((not c:getEnabled()) and (c:getStatMax("health") == 0)); end):count()
-   
-   return (rangerDetected >= 1) and (zombieDetected == 3)
+	if (g_ToorumMode == nil) then
+		local rangerDetected = fromChampions():where(function(c) return (c:getClass() == "Ranger"); end):count()
+		local zombieDetected = fromChampions():where(function(c) return ((not c:getEnabled()) and (c:getStatMax("health") == 0)); end):count()
+
+		g_ToorumMode = (rangerDetected >= 1) and (zombieDetected == 3)
+	end
+	
+	return g_ToorumMode
 end
 
 function dezombifyParty()
@@ -918,7 +991,9 @@ function getChampionFromOrdinal(ord)
 	return grimq.fromChampions():where(function(c) return c:getOrdinal() == ord; end):first()
 end
 
-
+function setLogLevel(level)
+	LOG_LEVEL = level
+end
 
 
 
@@ -995,16 +1070,30 @@ end
 
 
 function _activateAutos()
+	-- cache is toorum mode result, so that we remember being toorum after party is manipulated
+	local toorummode = isToorumMode()
+	logv("Toorum mode: ".. tostring(toorummode))
+	
+	logv("Starting auto-secrets... (AUTO_ALL_SECRETS is " .. tostring(AUTO_ALL_SECRETS) .. ")")
 	if (AUTO_ALL_SECRETS) then
 		fromAllEntitiesInWorld():where("name", "secret"):foreach(_initializeAutoSecret)
 	else
 		fromAllEntitiesInWorld():where(match("id", "^auto_secret")):foreach(_initializeAutoSecret)
 	end
 
+	logv("Starting auto-printers...")
 	fromAllEntitiesInWorld():where("name", "auto_printer"):foreach(_initializeAutoHudPrinter)
+
+	logv("Starting auto-torches...")
 	fromAllEntitiesInWorld():where(match("name", "^auto_")):where(isTorchHolder):foreach(function(auto) if (not auto:hasTorch()) then auto:addTorch(); end; end)
+
+	logv("Starting auto-alcoves...")
 	fromAllEntitiesInWorld():where(match("name", "^auto_")):where(isAlcoveOrAltar):foreach(moveItemsFromTileToAlcove)
+
+	logv("Starting autoexec scripts...")
 	fromAllEntitiesInWorld():where(isScript):foreach(_initializeAutoScript)
+	
+	logi("Started.")
 end
 
 function _initializeAutoSecret(auto)
@@ -1033,21 +1122,25 @@ end
 g_HudPrinters = { }
 
 function execHudPrinter(source)
+	logv("Executing hudprinter " .. source.id)
 	local text = g_HudPrinters[source.id]
 	if (text ~= nil) then
 		hudPrint(strformat(text))
+	else
+		logw("Auto-hud-printer not found in hudprinters list: " .. source.id)
 	end
 end
 
 -- NEW
 function _initializeAutoScript(ntt)
 	if (ntt.autoexec ~= nil) then
+		logv("Executing autoexec of " .. ntt.id .. "...)")
 		ntt:autoexec();
 	end
 	
 	if (ntt.autohook ~= nil) then
 		if (fw == nil or (not USE_JKOS_FRAMEWORK)) then
-			print("Can't install autohooks in ".. ntt.id .. " -> JKos framework not found or USE_JKOS_FRAMEWORK is false.")
+			loge("Can't install autohooks in ".. ntt.id .. " -> JKos framework not found or USE_JKOS_FRAMEWORK is false.")
 			return
 		end
 
@@ -1057,7 +1150,7 @@ function _initializeAutoScript(ntt)
 			
 			for hook in hooks:toIterator() do
 				local hookname = hook.key
-				print("Adding hook for: ".. ntt.id .. "." .. hookname .. " ...")
+				logv("Adding hook for: ".. ntt.id .. "." .. hookname .. " ...")
 				fw.addHooks(target, ntt.id .. "_" .. target .. "_" .. hookname, { [hookname] = hook.value } )
 			end
 		end
@@ -1073,7 +1166,13 @@ end
 -- BOOTSTRAP CODE
 -- ============================================================
 
+function _banner()
+	logi("GrimQ Version " .. LIB_VERSION_TEXT .. VERSION_SUFFIX .. " - Marco Mastropaolo (Xanathar)"
+end
+
 function _jkosAutoStart()
+	logi("Starting with jkos-fw integration, stage 2...")
+	
 	timers:setLevels(MAXLEVEL) 
 	fw.debug.enabled = DEBUG_MODE
 	fwInit:close() 
@@ -1081,7 +1180,11 @@ function _jkosAutoStart()
 	_activateAutos()
 end
 
+_banner()
+
 if (USE_JKOS_FRAMEWORK) then
+	logi("Starting with jkos-fw integration, stage 1...")
+
 	spawn("script_entity", party.level, 1, 1, 0, "logfw_init")
 		:setSource([[
 			function main()
@@ -1099,6 +1202,8 @@ if (USE_JKOS_FRAMEWORK) then
 		:setSilent(true)
 		:addConnector("activate", "grimq", "_jkosAutoStart")
 else
+	logi("Starting with standard bootstrap...")
+
 	spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
 		:setTriggeredByParty(true)
 		:setTriggeredByMonster(false)

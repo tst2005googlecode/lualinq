@@ -75,11 +75,16 @@ function moveItemsFromTileToAlcove(alcove)
 		end)
 end
 
+g_ToorumMode = nil
 function isToorumMode()
-   local rangerDetected = fromChampions():where(function(c) return (c:getClass() == "Ranger"); end):count()
-   local zombieDetected = fromChampions():where(function(c) return ((not c:getEnabled()) and (c:getStatMax("health") == 0)); end):count()
-   
-   return (rangerDetected >= 1) and (zombieDetected == 3)
+	if (g_ToorumMode == nil) then
+		local rangerDetected = fromChampions():where(function(c) return (c:getClass() == "Ranger"); end):count()
+		local zombieDetected = fromChampions():where(function(c) return ((not c:getEnabled()) and (c:getStatMax("health") == 0)); end):count()
+
+		g_ToorumMode = (rangerDetected >= 1) and (zombieDetected == 3)
+	end
+	
+	return g_ToorumMode
 end
 
 function dezombifyParty()
@@ -106,7 +111,9 @@ function getChampionFromOrdinal(ord)
 	return grimq.fromChampions():where(function(c) return c:getOrdinal() == ord; end):first()
 end
 
-
+function setLogLevel(level)
+	LOG_LEVEL = level
+end
 
 
 

@@ -2,7 +2,7 @@ cd /D %LUALINQROOTPATH%
 md build
 cd src
 
-copy /B /Y lualinq_froms.lua +lualinq_query.lua +lualinq_conversions.lua +lualinq_terminators.lua "%TEMP%\lualinq_temp.lua"
+copy /B /Y lualinq_log.lua +lualinq_ctor.lua +lualinq_froms.lua +lualinq_query.lua +lualinq_conversions.lua +lualinq_terminators.lua "%TEMP%\lualinq_temp.lua"
 
 copy /B /Y lualinq_header.lua +"%TEMP%\lualinq_temp.lua" ..\build\lualinq.lua
 
