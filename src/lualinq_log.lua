@@ -7,7 +7,7 @@ LIB_VERSION = 120
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
-		print(prefix .. LOG_PREFIX .. txt)
+		print(prefix .. LOG_PREFIX .. text)
 	end
 end
 
@@ -19,16 +19,16 @@ function logq(self, method)
 		for i = 1, 3 do
 			if (i <= items) then
 				if (i ~= 1) then
-					dumpdata = dumpdata + ", "
+					dumpdata = dumpdata .. ", "
 				end
-				dumpdata = dumpdata + tostring(self[i])
+				dumpdata = dumpdata .. tostring(self.m_Data[i])
 			end
 		end
 		
 		if (items > 3) then
-			dumpdata = dumpdata + ", ... }"
+			dumpdata = dumpdata .. ", ... }"
 		else
-			dumpdata = dumpdata + " }"
+			dumpdata = dumpdata .. " }"
 		end
 	
 		logv("after " .. method .. " => " .. items .. " items : " .. dumpdata)

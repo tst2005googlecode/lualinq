@@ -44,7 +44,7 @@ LIB_VERSION = 120
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
-		print(prefix .. LOG_PREFIX .. txt)
+		print(prefix .. LOG_PREFIX .. text)
 	end
 end
 
@@ -56,36 +56,36 @@ function logq(self, method)
 		for i = 1, 3 do
 			if (i <= items) then
 				if (i ~= 1) then
-					dumpdata = dumpdata + ", "
+					dumpdata = dumpdata .. ", "
 				end
-				dumpdata = dumpdata + tostring(self[i])
+				dumpdata = dumpdata .. tostring(self.m_Data[i])
 			end
 		end
 		
 		if (items > 3) then
-			dumpdata = dumpdata + ", ... }"
+			dumpdata = dumpdata .. ", ... }"
 		else
-			dumpdata = dumpdata + " }"
+			dumpdata = dumpdata .. " }"
 		end
 	
-		print("[..]" .. LOG_PREFIX .. "after " .. method .. " => " .. items .. " items : " .. dumpdata)
+		logv("after " .. method .. " => " .. items .. " items : " .. dumpdata)
 	end
 end
 
 function logv(txt)
-	log(3, "[..] ", txt)
+	_log(3, "[..] ", txt)
 end
 
 function logi(txt)
-	log(2, "[ii] ", txt)
+	_log(2, "[ii] ", txt)
 end
 
 function logw(txt)
-	log(1, "[W?] ", txt)
+	_log(1, "[W?] ", txt)
 end
 
 function loge(txt)
-	log(0, "[E!] ", txt)
+	_log(0, "[E!] ", txt)
 end
 
 
@@ -1168,14 +1168,14 @@ end
 -- ============================================================
 
 function _banner()
-	logi("GrimQ Version " .. LIB_VERSION_TEXT .. VERSION_SUFFIX .. " - Marco Mastropaolo (Xanathar)"
+	logi("GrimQ Version " .. LIB_VERSION_TEXT .. VERSION_SUFFIX .. " - Marco Mastropaolo (Xanathar)")
 end
 
 function _jkosAutoStart()
 	logi("Starting with jkos-fw integration, stage 2...")
 	
 	timers:setLevels(MAXLEVEL) 
-	fw.debug.enabled = DEBUG_MODE
+	fw.debug.enabled = (LOG_LEVEL > 0)
 	fwInit:close() 
 
 	_activateAutos()

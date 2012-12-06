@@ -10,7 +10,7 @@ function _jkosAutoStart()
 	logi("Starting with jkos-fw integration, stage 2...")
 	
 	timers:setLevels(MAXLEVEL) 
-	fw.debug.enabled = DEBUG_MODE
+	fw.debug.enabled = (LOG_LEVEL > 0)
 	fwInit:close() 
 
 	_activateAutos()
