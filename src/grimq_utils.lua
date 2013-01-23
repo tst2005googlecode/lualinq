@@ -139,78 +139,134 @@ function directionFromDelta(dx, dy)
 	else return 3; end
 end
 
-function destroy(entity)
-	if (isItem(entity)) then
-		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
-			:where(function(i) return i.item == entity; end)		
-			:first()
-			
-		if (itemInInv ~= nil) then
-			itemInInv:destroy()
-		else
-			entity:destroy()
-		end
-	elseif (entity == party) then
-		gameover()
-	else
-		entity:destroy()
-	end
-end
-
 function find(id)
 	local entity = findEntity(id)
-	if (entity ~= nil) then
-		return entity
-	end
+	if (entity ~= nil) then	return entity; end
 	
-	return fromPartyInventory(true, inventory.all, true):where("id", id):first()
+	entity = fromPartyInventory(true, inventory.all, true):where("id", id):first()
+	if (entity ~= nil) then	return entity; end
+	
+	local containers = fromAllEntitiesInWorld()
+				:where(isItem)
+				:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+	
+	entity = containers
+		:where(function(ii) return ii.id == id; end)
+		:first()
+	
+	if (entity ~= nil) then	return entity; end
+		
+	entity = containers
+		:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+		:where(function(ii) return ii.id == id; end)
+		:first()
+		
+	return entity
 end
 
-function replace(entity, entityToSpawn, desiredId)
-	if (isItem(entity)) then
-		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
-			:where(function(i) return i.item == entity; end)		
-			:first()
-			
-		if (itemInInv ~= nil) then
-			return itemInInv:replace(entityToSpawn, desiredId)
-		else
-			local alcoveOrContainer = from(entitiesAt(entity.level, entity.x, entity.y))
-				:where(isContainerOrAlcove)
-				:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
-				:first()
-				
-			if (alcoveOrContainer ~= nil) then
-				if (isAlcoveOrAltar(alcoveOrContainer)) then
-					entity:destroy()
-					local obj = spawn(entityToSpawn, nil, nil, nil, nil, desiredId)
-					alcoveOrContainer:addItem(obj)
-					return obj
-				else
-					local itemInInv = fromContainerItemEx(alcoveOrContainer)
-						:where(function(i) return i.item == entity; end)		
-						:first()					
+function getEx(entity)
+	-- entity isn't in world, try inventory
+	local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
+		:where(function(i) return i.entity == entity; end)		
+		:first()
+		
+	if (itemInInv ~= nil) then
+		return itemInInv
+	end
+	
+	-- inventory failed, we try alcoves and containers
+	-- if we don't have an entity level, we in an obscure "item in sack in alcove" scenario
+	if (entity.level == nil) then
+		local topcontainers = fromAllEntitiesInWorld():where(isContainerOrAlcove)
+		
+		local container = topcontainers
+						:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+						:first()
 						
-					return itemInInv:replace(entityToSpawn, desiredId)
-				end
-			end
+		if (container ~= nil) then
+			local itemInInv = fromContainerItemEx(container)
+				:where(function(i) return i.entity == entity; end)		
+				:first()					
+				
+			return itemInInv
+		end
+		
+		container = topcontainers
+						:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+						:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+						:first()
+						
+		if (container ~= nil) then
+			local itemInInv = fromContainerItemEx(container)
+				:where(function(i) return i.entity == entity; end)		
+				:first()					
+				
+			return itemInInv
+		else
+			logw("findAndCallback can't find item " .. entity.id)
+			return
 		end
 	end
 	
-	local x = entity.x
-	local y = entity.y
-	local l = entity.level
-	local f = entity.facing
-	entity:destroy()
-	return spawn(entityToSpawn, l, x, y, f, desiredId)
+	-- we are in classic alcove or container scenario here
+	local alcoveOrContainer = from(entitiesAt(entity.level, entity.x, entity.y))
+		:where(isContainerOrAlcove)
+		:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+		:first()
+		
+	if (alcoveOrContainer ~= nil) then
+		if (isAlcoveOrAltar(alcoveOrContainer)) then
+			return _createExtEntity(-1, entity, nil, nil, false, -1, alcoveOrContainer, nil)
+		else
+			local itemInInv = fromContainerItemEx(alcoveOrContainer)
+				:where(function(i) return i.entity == entity; end)		
+				:first()					
+				
+			return itemInInv		
+		end
+	end
+	
+	-- the simplest case sadly happens last
+	local wentity = findEntity(entity.id)
+	
+	if (wentity ~= nil) then	
+		return _createExtEntity(-1, entity, nil, nil, false, -1, nil, true)
+	end
+	
+	logw("findAndCallback can't find entity " .. entityid)
 end
 
 function gameover()
 	damageTile(party.level, party.x, party.y, party.facing, 64, "physical", 100000000)
 end
 
+function findEx(entityid)
+	local entity = find(entityid)
+	
+	if (entity == nil) then 
+		return nil
+	end
+	
+	local ex = getEx(entity)
+	
+	return ex
+end
 
+function replace(entity, entityToSpawn, desiredId)
+	local ex = getEx(entity)
+	
+	if (ex ~= nil) then
+		ex:replace(entityToSpawn, desiredId)
+	end
+end
 
+function destroy(entity)
+	local ex = getEx(entity)
+	
+	if (ex ~= nil) then
+		ex:destroy()
+	end
+end
 
 
 

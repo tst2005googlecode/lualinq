@@ -37,8 +37,8 @@ CONTAINERITEM_MAXSLOTS = 10
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.3"
-LIB_VERSION = 130
+LIB_VERSION_TEXT = "1.3.2"
+LIB_VERSION = 132
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
@@ -632,30 +632,8 @@ end
 --		[inventorySlots] => nil, or a table of integers to limit the search to the specified slots
 --		[includeMouse] => if true, the mouse item is included in the search
 function fromChampionInventory(champion, recurseIntoContainers, inventorySlots, includeMouse)
-	if (inventorySlots == nil) then
-		inventorySlots = inventory.all
-	end
-
-	local collection = { }
-	for i = 1, #inventorySlots do
-		local item = champion:getItem(i)
-		
-		if (item ~= nil) then
-			table.insert(collection, item)
-			
-			if (recurseIntoContainers) then
-				for subItem in item:containedItems() do			
-					table.insert(collection, subItem)
-				end
-			end
-		end
-	end
-	
-	if (includeMouse and (getMouseItem() ~= nil)) then
-		table.insert(collection, getMouseItem())
-	end
-	
-	return fromArrayInstance(collection)
+	return fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots, includeMouse)
+		:select("entity")
 end
 
 -- Returns a grimq structure containing all the items in the party inventory
@@ -666,31 +644,38 @@ function fromPartyInventory(recurseIntoContainers, inventorySlots, includeMouse)
 	return fromChampions():selectMany(function(v) return fromChampionInventory(v, recurseIntoContainers, inventorySlots, includeMouse):toArray(); end)
 end
 
--- [private] Creates an item object
-function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, _containerSlot)
+-- [private] Creates an extended object
+function _createExtEntity(_slotnumber, _entity, _champion, _container, _ismouse, _containerSlot, _alcove, _isworld)
 	return {
 		slot = _slotnumber,
-		item = _item,
+		entity = _entity,
+		item = _entity, -- this is for backward compatibilty only!!
 		champion = _champion,
 		container = _container,
 		ismouse = _ismouse,
 		containerSlot = _containerSlot,
+		alcove = _alcove,
+		isworld = _isworld,
 		
 		destroy = function(self)
-			if (self.container ~= nil) then
+			if (self.entity == party) then
+				gameover()
+			elseif (self.container ~= nil) then
 				self.container:removeItem(self.slot)
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
 			elseif (self.ismouse) then
 				setMouseItem(nil)
 			else
-				self.item:destroy()
+				self.entity:destroy()
 			end
 		end,
 				
 		replaceCallback = function(self, constructor)
 			local obj = nil
-			if (self.container ~= nil) then
+			if (self.entity == party) then
+				gameover()
+			elseif (self.container ~= nil) then
 				self.container:removeItem(self.slot)
 				obj = constructor()
 				self.container:insertItem(self.slot, obj)
@@ -702,23 +687,61 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 				setMouseItem(nil)
 				obj = constructor()
 				setMouseItem(obj)
+			elseif (self.alcove ~= nil) then
+				self.entity:destroy()
+				obj = constructor()
+				self.alcove:addItem(obj)
+			elseif (self.isworld) then
+				local l = self.entity.level
+				local x = self.entity.x
+				local y = self.entity.y
+				local f = self.entity.facing
+				self.entity:destroy()
+				obj = constructor(l, x, y, f)
 			else 
-				logw("itemobject.replace fallback on incompatible default")
+				logw("itemobject.replaceCallback fallback on incompatible default")
 			end
 			return obj
 		end,
 		
 		replace = function(self, itemname, desiredid)
-			return self:replaceCallback(function() return spawn(itemname, nil, nil, nil, nil, desiredid); end)
+			return self:replaceCallback(function(l,x,y,f) return spawn(itemname, l, x, y, f, desiredid); end)
+		end,
+		
+		debug = function(self)
+			local obj = nil
+			if (self.entity == party) then
+				print("=> entity is party")
+			elseif (self.container ~= nil) then
+				print("=> entity is slot " .. self.slot .. " of cont " .. self.container.id)
+			elseif (self.slot >= 0) then
+				print("=> entity is slot " .. self.slot .. " of champion ord#" .. self.champion:getOrdinal())
+			elseif (self.ismouse) then
+				print("=> entity is on mouse")
+			elseif (self.alcove ~= nil) then
+				print("=> entity is in alcove " .. self.alcove.id)
+			elseif (self.isworld) then
+				local l = self.entity.level
+				local x = self.entity.x
+				local y = self.entity.y
+				local f = self.entity.facing
+				print("=> entity is in world at level=".. l, " pos = (" .. x .. "," .. y .. ") facing=" .. f)
+			else 
+				logw("itemobject.replaceCallback fallback on incompatible default")
+			end
+			return obj
 		end,
 		
 	}
 end
 
 function _appendContainerItem(collection, item, champion, containerslot)
+	print("appending contents of container " .. item.id)
 	for j = 1, CONTAINERITEM_MAXSLOTS do
 		if (item:getItem(j) ~= nil) then
-			table.insert(collection, _createItemObject(j, item:getItem(j), champion, item, false, containerslot))
+			print("  appended " .. item:getItem(j).id)
+			table.insert(collection, _createExtEntity(j, item:getItem(j), champion, item, false, containerslot))
+			_appendContainerItem(collection, item:getItem(j), nil, j)
 		end
 	end
 end
@@ -738,7 +761,7 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 		local item = champion:getItem(i)
 		
 		if (item ~= nil) then
-			table.insert(collection, _createItemObject(i, item, champion, nil, false, -1))
+			table.insert(collection, _createExtEntity(i, item, champion, nil, false, -1))
 			
 			if (recurseIntoContainers) then
 				_appendContainerItem(collection, item, champion, i)
@@ -748,7 +771,7 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 	
 	if (includeMouse and (getMouseItem() ~= nil)) then
 		local item = getMouseItem()
-		table.insert(collection, _createItemObject(-1, item, nil, nil, true, -1))
+		table.insert(collection, _createExtEntity(-1, item, nil, nil, true, -1))
 		
 		if (recurseIntoContainers) then
 			_appendContainerItem(collection, item, nil, -1)
@@ -758,7 +781,7 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 	return fromArrayInstance(collection)
 end
 
-
+-- Returns a grimq structure filled with extended entities of the contents of a container
 function fromContainerItemEx(item)
 	local collection = { }
 	_appendContainerItem(collection, item, nil, -1)
@@ -1048,78 +1071,134 @@ function directionFromDelta(dx, dy)
 	else return 3; end
 end
 
-function destroy(entity)
-	if (isItem(entity)) then
-		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
-			:where(function(i) return i.item == entity; end)		
-			:first()
-			
-		if (itemInInv ~= nil) then
-			itemInInv:destroy()
-		else
-			entity:destroy()
-		end
-	elseif (entity == party) then
-		gameover()
-	else
-		entity:destroy()
-	end
-end
-
 function find(id)
 	local entity = findEntity(id)
-	if (entity ~= nil) then
-		return entity
-	end
+	if (entity ~= nil) then	return entity; end
 	
-	return fromPartyInventory(true, inventory.all, true):where("id", id):first()
+	entity = fromPartyInventory(true, inventory.all, true):where("id", id):first()
+	if (entity ~= nil) then	return entity; end
+	
+	local containers = fromAllEntitiesInWorld()
+				:where(isItem)
+				:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+	
+	entity = containers
+		:where(function(ii) return ii.id == id; end)
+		:first()
+	
+	if (entity ~= nil) then	return entity; end
+		
+	entity = containers
+		:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+		:where(function(ii) return ii.id == id; end)
+		:first()
+		
+	return entity
 end
 
-function replace(entity, entityToSpawn, desiredId)
-	if (isItem(entity)) then
-		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
-			:where(function(i) return i.item == entity; end)		
-			:first()
-			
-		if (itemInInv ~= nil) then
-			return itemInInv:replace(entityToSpawn, desiredId)
-		else
-			local alcoveOrContainer = from(entitiesAt(entity.level, entity.x, entity.y))
-				:where(isContainerOrAlcove)
-				:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
-				:first()
-				
-			if (alcoveOrContainer ~= nil) then
-				if (isAlcoveOrAltar(alcoveOrContainer)) then
-					entity:destroy()
-					local obj = spawn(entityToSpawn, nil, nil, nil, nil, desiredId)
-					alcoveOrContainer:addItem(obj)
-					return obj
-				else
-					local itemInInv = fromContainerItemEx(alcoveOrContainer)
-						:where(function(i) return i.item == entity; end)		
-						:first()					
+function getEx(entity)
+	-- entity isn't in world, try inventory
+	local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
+		:where(function(i) return i.entity == entity; end)		
+		:first()
+		
+	if (itemInInv ~= nil) then
+		return itemInInv
+	end
+	
+	-- inventory failed, we try alcoves and containers
+	-- if we don't have an entity level, we in an obscure "item in sack in alcove" scenario
+	if (entity.level == nil) then
+		local topcontainers = fromAllEntitiesInWorld():where(isContainerOrAlcove)
+		
+		local container = topcontainers
+						:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+						:first()
 						
-					return itemInInv:replace(entityToSpawn, desiredId)
-				end
-			end
+		if (container ~= nil) then
+			local itemInInv = fromContainerItemEx(container)
+				:where(function(i) return i.entity == entity; end)		
+				:first()					
+				
+			return itemInInv
+		end
+		
+		container = topcontainers
+						:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+						:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+						:first()
+						
+		if (container ~= nil) then
+			local itemInInv = fromContainerItemEx(container)
+				:where(function(i) return i.entity == entity; end)		
+				:first()					
+				
+			return itemInInv
+		else
+			logw("findAndCallback can't find item " .. entity.id)
+			return
 		end
 	end
 	
-	local x = entity.x
-	local y = entity.y
-	local l = entity.level
-	local f = entity.facing
-	entity:destroy()
-	return spawn(entityToSpawn, l, x, y, f, desiredId)
+	-- we are in classic alcove or container scenario here
+	local alcoveOrContainer = from(entitiesAt(entity.level, entity.x, entity.y))
+		:where(isContainerOrAlcove)
+		:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+		:first()
+		
+	if (alcoveOrContainer ~= nil) then
+		if (isAlcoveOrAltar(alcoveOrContainer)) then
+			return _createExtEntity(-1, entity, nil, nil, false, -1, alcoveOrContainer, nil)
+		else
+			local itemInInv = fromContainerItemEx(alcoveOrContainer)
+				:where(function(i) return i.entity == entity; end)		
+				:first()					
+				
+			return itemInInv		
+		end
+	end
+	
+	-- the simplest case sadly happens last
+	local wentity = findEntity(entity.id)
+	
+	if (wentity ~= nil) then	
+		return _createExtEntity(-1, entity, nil, nil, false, -1, nil, true)
+	end
+	
+	logw("findAndCallback can't find entity " .. entityid)
 end
 
 function gameover()
 	damageTile(party.level, party.x, party.y, party.facing, 64, "physical", 100000000)
 end
 
+function findEx(entityid)
+	local entity = find(entityid)
+	
+	if (entity == nil) then 
+		return nil
+	end
+	
+	local ex = getEx(entity)
+	
+	return ex
+end
 
+function replace(entity, entityToSpawn, desiredId)
+	local ex = getEx(entity)
+	
+	if (ex ~= nil) then
+		ex:replace(entityToSpawn, desiredId)
+	end
+end
 
+function destroy(entity)
+	local ex = getEx(entity)
+	
+	if (ex ~= nil) then
+		ex:destroy()
+	end
+end
 
 
 

@@ -31,30 +31,8 @@ end
 --		[inventorySlots] => nil, or a table of integers to limit the search to the specified slots
 --		[includeMouse] => if true, the mouse item is included in the search
 function fromChampionInventory(champion, recurseIntoContainers, inventorySlots, includeMouse)
-	if (inventorySlots == nil) then
-		inventorySlots = inventory.all
-	end
-
-	local collection = { }
-	for i = 1, #inventorySlots do
-		local item = champion:getItem(i)
-		
-		if (item ~= nil) then
-			table.insert(collection, item)
-			
-			if (recurseIntoContainers) then
-				for subItem in item:containedItems() do			
-					table.insert(collection, subItem)
-				end
-			end
-		end
-	end
-	
-	if (includeMouse and (getMouseItem() ~= nil)) then
-		table.insert(collection, getMouseItem())
-	end
-	
-	return fromArrayInstance(collection)
+	return fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots, includeMouse)
+		:select("entity")
 end
 
 -- Returns a grimq structure containing all the items in the party inventory
@@ -65,31 +43,38 @@ function fromPartyInventory(recurseIntoContainers, inventorySlots, includeMouse)
 	return fromChampions():selectMany(function(v) return fromChampionInventory(v, recurseIntoContainers, inventorySlots, includeMouse):toArray(); end)
 end
 
--- [private] Creates an item object
-function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, _containerSlot)
+-- [private] Creates an extended object
+function _createExtEntity(_slotnumber, _entity, _champion, _container, _ismouse, _containerSlot, _alcove, _isworld)
 	return {
 		slot = _slotnumber,
-		item = _item,
+		entity = _entity,
+		item = _entity, -- this is for backward compatibilty only!!
 		champion = _champion,
 		container = _container,
 		ismouse = _ismouse,
 		containerSlot = _containerSlot,
+		alcove = _alcove,
+		isworld = _isworld,
 		
 		destroy = function(self)
-			if (self.container ~= nil) then
+			if (self.entity == party) then
+				gameover()
+			elseif (self.container ~= nil) then
 				self.container:removeItem(self.slot)
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
 			elseif (self.ismouse) then
 				setMouseItem(nil)
 			else
-				self.item:destroy()
+				self.entity:destroy()
 			end
 		end,
 				
 		replaceCallback = function(self, constructor)
 			local obj = nil
-			if (self.container ~= nil) then
+			if (self.entity == party) then
+				gameover()
+			elseif (self.container ~= nil) then
 				self.container:removeItem(self.slot)
 				obj = constructor()
 				self.container:insertItem(self.slot, obj)
@@ -101,23 +86,61 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 				setMouseItem(nil)
 				obj = constructor()
 				setMouseItem(obj)
+			elseif (self.alcove ~= nil) then
+				self.entity:destroy()
+				obj = constructor()
+				self.alcove:addItem(obj)
+			elseif (self.isworld) then
+				local l = self.entity.level
+				local x = self.entity.x
+				local y = self.entity.y
+				local f = self.entity.facing
+				self.entity:destroy()
+				obj = constructor(l, x, y, f)
 			else 
-				logw("itemobject.replace fallback on incompatible default")
+				logw("itemobject.replaceCallback fallback on incompatible default")
 			end
 			return obj
 		end,
 		
 		replace = function(self, itemname, desiredid)
-			return self:replaceCallback(function() return spawn(itemname, nil, nil, nil, nil, desiredid); end)
+			return self:replaceCallback(function(l,x,y,f) return spawn(itemname, l, x, y, f, desiredid); end)
+		end,
+		
+		debug = function(self)
+			local obj = nil
+			if (self.entity == party) then
+				print("=> entity is party")
+			elseif (self.container ~= nil) then
+				print("=> entity is slot " .. self.slot .. " of cont " .. self.container.id)
+			elseif (self.slot >= 0) then
+				print("=> entity is slot " .. self.slot .. " of champion ord#" .. self.champion:getOrdinal())
+			elseif (self.ismouse) then
+				print("=> entity is on mouse")
+			elseif (self.alcove ~= nil) then
+				print("=> entity is in alcove " .. self.alcove.id)
+			elseif (self.isworld) then
+				local l = self.entity.level
+				local x = self.entity.x
+				local y = self.entity.y
+				local f = self.entity.facing
+				print("=> entity is in world at level=".. l, " pos = (" .. x .. "," .. y .. ") facing=" .. f)
+			else 
+				logw("itemobject.replaceCallback fallback on incompatible default")
+			end
+			return obj
 		end,
 		
 	}
 end
 
 function _appendContainerItem(collection, item, champion, containerslot)
+	print("appending contents of container " .. item.id)
 	for j = 1, CONTAINERITEM_MAXSLOTS do
 		if (item:getItem(j) ~= nil) then
-			table.insert(collection, _createItemObject(j, item:getItem(j), champion, item, false, containerslot))
+			print("  appended " .. item:getItem(j).id)
+			table.insert(collection, _createExtEntity(j, item:getItem(j), champion, item, false, containerslot))
+			_appendContainerItem(collection, item:getItem(j), nil, j)
 		end
 	end
 end
@@ -137,7 +160,7 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 		local item = champion:getItem(i)
 		
 		if (item ~= nil) then
-			table.insert(collection, _createItemObject(i, item, champion, nil, false, -1))
+			table.insert(collection, _createExtEntity(i, item, champion, nil, false, -1))
 			
 			if (recurseIntoContainers) then
 				_appendContainerItem(collection, item, champion, i)
@@ -147,7 +170,7 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 	
 	if (includeMouse and (getMouseItem() ~= nil)) then
 		local item = getMouseItem()
-		table.insert(collection, _createItemObject(-1, item, nil, nil, true, -1))
+		table.insert(collection, _createExtEntity(-1, item, nil, nil, true, -1))
 		
 		if (recurseIntoContainers) then
 			_appendContainerItem(collection, item, nil, -1)
@@ -157,7 +180,7 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 	return fromArrayInstance(collection)
 end
 
-
+-- Returns a grimq structure filled with extended entities of the contents of a container
 function fromContainerItemEx(item)
 	local collection = { }
 	_appendContainerItem(collection, item, nil, -1)
