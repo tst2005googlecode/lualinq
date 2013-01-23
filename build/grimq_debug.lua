@@ -13,9 +13,6 @@
 -- CONFIGURATION OPTIONS                                                 --
 ---------------------------------------------------------------------------
 
--- CHANGE THIS ACCORDING TO YOUR DUNGEON!
-MAXLEVEL = 1
-
 -- change this if you don't want all secrets to be "auto"
 AUTO_ALL_SECRETS = false
 
@@ -34,13 +31,14 @@ LOG_PREFIX = "GrimQ: "
 ---------------------------------------------------------------------------
 
 VERSION_SUFFIX = ".DEBUG"
-
+MAXLEVEL = getMaxLevels()
+CONTAINERITEM_MAXSLOTS = 10
 -- ============================================================
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.2"
-LIB_VERSION = 120
+LIB_VERSION_TEXT = "1.3"
+LIB_VERSION = 130
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
@@ -605,6 +603,8 @@ facing =
 -- LUALINQ GENERATORS
 -- ============================================================
 
+
+
 -- Returns a grimq structure containing all champions
 function fromChampions()
 	local collection = { }
@@ -677,37 +677,50 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 		containerSlot = _containerSlot,
 		
 		destroy = function(self)
-			local destroyed = false
-			
 			if (self.container ~= nil) then
-				logi("itemObject couldn't be destroyed")
-				destroyed = false
+				self.container:removeItem(self.slot)
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
-				destroyed = true
-			elseif (ismouse) then
+			elseif (self.ismouse) then
 				setMouseItem(nil)
-				destroyed = true
+			else
+				self.item:destroy()
 			end
-			return destroyed
+		end,
+				
+		replaceCallback = function(self, constructor)
+			local obj = nil
+			if (self.container ~= nil) then
+				self.container:removeItem(self.slot)
+				obj = constructor()
+				self.container:insertItem(self.slot, obj)
+			elseif (self.slot >= 0) then
+				self.champion:removeItem(self.slot)
+				obj = constructor()
+				self.champion:insertItem(self.slot, obj)
+			elseif (self.ismouse) then
+				setMouseItem(nil)
+				obj = constructor()
+				setMouseItem(obj)
+			else 
+				logw("itemobject.replace fallback on incompatible default")
+			end
+			return obj
 		end,
 		
-		replace = function(self, newitem, tryhard)
-			local done = false
-			if (self.container ~= nil) then
-				logi("itemObject couldn't be replaced")
-				done = false
-			elseif (self.slot >= 0) then
-				self.champion:removeItem(self.slot)
-				self.champion:insertItem(self.slot, newitem)
-				done = true
-			elseif (ismouse) then
-				setMouseItem(nil)
-				setMouseItem(newitem)
-			end
-			return done
-		end
+		replace = function(self, itemname, desiredid)
+			return self:replaceCallback(function() return spawn(itemname, nil, nil, nil, nil, desiredid); end)
+		end,
+		
 	}
+end
+
+function _appendContainerItem(collection, item, champion, containerslot)
+	for j = 1, CONTAINERITEM_MAXSLOTS do
+		if (item:getItem(j) ~= nil) then
+			table.insert(collection, _createItemObject(j, item:getItem(j), champion, item, false, containerslot))
+		end
+	end
 end
 
 -- Returns a grimq structure containing item objects in the champion's inventory
@@ -728,19 +741,30 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 			table.insert(collection, _createItemObject(i, item, champion, nil, false, -1))
 			
 			if (recurseIntoContainers) then
-				for subItem in item:containedItems() do			
-					table.insert(collection, _createItemObject(-1, subItem, champion, item, false, i))
-				end
+				_appendContainerItem(collection, item, champion, i)
 			end
 		end
 	end
 	
 	if (includeMouse and (getMouseItem() ~= nil)) then
-		table.insert(collection, _createItemObject(-1, getMouseItem(), nil, nil, true, -1))
+		local item = getMouseItem()
+		table.insert(collection, _createItemObject(-1, item, nil, nil, true, -1))
+		
+		if (recurseIntoContainers) then
+			_appendContainerItem(collection, item, nil, -1)
+		end
 	end
 	
 	return fromArrayInstance(collection)
 end
+
+
+function fromContainerItemEx(item)
+	local collection = { }
+	_appendContainerItem(collection, item, nil, -1)
+	return fromArrayInstance(collection)
+end
+
 
 -- Returns a grimq structure containing all the item-objects in the party inventory
 --		[recurseIntoContainers] => true, to recurse into sacks, crates, etc.
@@ -823,6 +847,10 @@ function isAlcoveOrAltar(entity)
 	return entity.getItemCount ~= nil
 end
 
+function isContainerOrAlcove(entity)
+	return entity.containedItems ~= nil
+end
+
 function isDoor(entity)
 	return (entity.setDoorState ~= nil)
 end
@@ -884,34 +912,34 @@ end
 -- ============================================================
 
 -- saves an item into the table
-function saveItem(item)
+function saveItem(item, slot)
    local itemTable = { }
+   itemTable.id = item.id
    itemTable.name = item.name
    itemTable.stackSize = item:getStackSize()
    itemTable.fuel = item:getFuel()
    itemTable.charges = item:getCharges()
    itemTable.scrollText = item:getScrollText()
+   itemTable.scrollImage = item:getScrollImage()
+   itemTable.slot = slot
    
-   local idx = 0
-   for subItem in item:containedItems() do
-	  if (idx == 0) then
-		 itemTable.subItems = { }
-	  end
-	  
-	  itemTable.subItems[idx] = saveItem(subItem)
-	  idx = idx + 1
-   end
+	for j = 1, CONTAINERITEM_MAXSLOTS do
+		if (item:getItem(j) ~= nil) then
+			if (itemTable.subItems == nil) then itemTable.subItems = {}; end
+			table.insert(itemTable.subItems, saveItem(item:getItem(j), j))
+		end
+	end
    
    return itemTable
 end
 
 -- loads an item from the table
-function loadItem(itemTable, level, x, y, facing)
+function loadItem(itemTable, level, x, y, facing, id)
    local spitem = nil
    if (level ~= nil) then
-	  spitem = spawn(itemTable.name, level, x, y, facing)
+	  spitem = spawn(itemTable.name, level, x, y, facing, id)
    else
-	  spitem = spawn(itemTable.name)
+	  spitem = spawn(itemTable.name, nil, nil, nil, nil, id)
    end
    if itemTable.stackSize > 0 then
 	  spitem:setStackSize(itemTable.stackSize)
@@ -923,13 +951,21 @@ function loadItem(itemTable, level, x, y, facing)
    if itemTable.scrollText ~= nil then
 	  spitem:setScrollText(itemTable.scrollText)
    end
+      
+   if itemTable.scrollImage ~= nil then
+	  spitem:setScrollImage(itemTable.scrollImage)
+   end
    
    spitem:setFuel(itemTable.fuel)
    
    if (itemTable.subItems ~= nil) then
 	  for _, subTable in pairs(itemTable.subItems) do
 		 local subItem = loadItem(subTable)
-		 spitem:addItem(subItem, false)
+		 if (subTable.slot ~= nil) then
+			spitem:insertItem(subTable.slot, subItem)
+		 else
+			spitem:addItem(subItem)
+		 end
 	  end
    end
    
@@ -996,8 +1032,91 @@ function setLogLevel(level)
 	LOG_LEVEL = level
 end
 
+-- 1.3
+function directionFromPos(fromx, fromy, tox, toy)
+	local dx = tox - fromx
+	local dy = toy - fromy
+	return directionFromDelta(dx, dy)
+end
 
+function directionFromDelta(dx, dy)
+	if (dx > dy) then dy = 0; else dx = 0; end
 
+	if (dy < 0) then return 0; 
+	elseif (dx > 0) then return 1;
+	elseif (dy > 0) then return 2;
+	else return 3; end
+end
+
+function destroy(entity)
+	if (isItem(entity)) then
+		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
+			:where(function(i) return i.item == entity; end)		
+			:first()
+			
+		if (itemInInv ~= nil) then
+			itemInInv:destroy()
+		else
+			entity:destroy()
+		end
+	elseif (entity == party) then
+		gameover()
+	else
+		entity:destroy()
+	end
+end
+
+function find(id)
+	local entity = findEntity(id)
+	if (entity ~= nil) then
+		return entity
+	end
+	
+	return fromPartyInventory(true, inventory.all, true):where("id", id):first()
+end
+
+function replace(entity, entityToSpawn, desiredId)
+	if (isItem(entity)) then
+		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
+			:where(function(i) return i.item == entity; end)		
+			:first()
+			
+		if (itemInInv ~= nil) then
+			return itemInInv:replace(entityToSpawn, desiredId)
+		else
+			local alcoveOrContainer = from(entitiesAt(entity.level, entity.x, entity.y))
+				:where(isContainerOrAlcove)
+				:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+				:first()
+				
+			if (alcoveOrContainer ~= nil) then
+				if (isAlcoveOrAltar(alcoveOrContainer)) then
+					entity:destroy()
+					local obj = spawn(entityToSpawn, nil, nil, nil, nil, desiredId)
+					alcoveOrContainer:addItem(obj)
+					return obj
+				else
+					local itemInInv = fromContainerItemEx(alcoveOrContainer)
+						:where(function(i) return i.item == entity; end)		
+						:first()					
+						
+					return itemInInv:replace(entityToSpawn, desiredId)
+				end
+			end
+		end
+	end
+	
+	local x = entity.x
+	local y = entity.y
+	local l = entity.level
+	local f = entity.facing
+	entity:destroy()
+	return spawn(entityToSpawn, l, x, y, f, desiredId)
+end
+
+function gameover()
+	damageTile(party.level, party.x, party.y, party.facing, 64, "physical", 100000000)
+end
 
 
 
@@ -1182,6 +1301,11 @@ function _jkosAutoStart()
 end
 
 _banner()
+
+if (isWall == nil) then
+	loge("This version of GrimQ requires Legend of Grimrock 1.3.6 or later!")
+end
+
 
 if (USE_JKOS_FRAMEWORK) then
 	logi("Starting with jkos-fw integration, stage 1...")

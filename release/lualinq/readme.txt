@@ -7,7 +7,7 @@ ChangeLog
 	o LuaLinq: "select" method accepts a property name instead of a selector function
 	o LuaLinq: "where" method accepts a property name and a value instead of a predicate
 	o LuaLinq: private methods are prefixed with an underscore
-	o GrimQ: new: reverseFacing, getChampionFromOrdinal, strformat, strsplit
+	o GrimQ: new: reverseFacing, getChampionFromOrdinal, strformat, string methods
 	o GrimQ: added *optional* integrations with JKos framework hooks
 	o GrimQ: added AUTO_ALL_SECRETS options to shortcut all secrets to be auto
 
