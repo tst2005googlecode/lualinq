@@ -14,6 +14,10 @@ function isAlcoveOrAltar(entity)
 	return entity.getItemCount ~= nil
 end
 
+function isContainerOrAlcove(entity)
+	return entity.containedItems ~= nil
+end
+
 function isDoor(entity)
 	return (entity.setDoorState ~= nil)
 end

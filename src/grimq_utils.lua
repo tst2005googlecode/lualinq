@@ -3,34 +3,34 @@
 -- ============================================================
 
 -- saves an item into the table
-function saveItem(item)
+function saveItem(item, slot)
    local itemTable = { }
+   itemTable.id = item.id
    itemTable.name = item.name
    itemTable.stackSize = item:getStackSize()
    itemTable.fuel = item:getFuel()
    itemTable.charges = item:getCharges()
    itemTable.scrollText = item:getScrollText()
+   itemTable.scrollImage = item:getScrollImage()
+   itemTable.slot = slot
    
-   local idx = 0
-   for subItem in item:containedItems() do
-	  if (idx == 0) then
-		 itemTable.subItems = { }
-	  end
-	  
-	  itemTable.subItems[idx] = saveItem(subItem)
-	  idx = idx + 1
-   end
+	for j = 1, CONTAINERITEM_MAXSLOTS do
+		if (item:getItem(j) ~= nil) then
+			if (itemTable.subItems == nil) then itemTable.subItems = {}; end
+			table.insert(itemTable.subItems, saveItem(item:getItem(j), j))
+		end
+	end
    
    return itemTable
 end
 
 -- loads an item from the table
-function loadItem(itemTable, level, x, y, facing)
+function loadItem(itemTable, level, x, y, facing, id)
    local spitem = nil
    if (level ~= nil) then
-	  spitem = spawn(itemTable.name, level, x, y, facing)
+	  spitem = spawn(itemTable.name, level, x, y, facing, id)
    else
-	  spitem = spawn(itemTable.name)
+	  spitem = spawn(itemTable.name, nil, nil, nil, nil, id)
    end
    if itemTable.stackSize > 0 then
 	  spitem:setStackSize(itemTable.stackSize)
@@ -42,13 +42,21 @@ function loadItem(itemTable, level, x, y, facing)
    if itemTable.scrollText ~= nil then
 	  spitem:setScrollText(itemTable.scrollText)
    end
+      
+   if itemTable.scrollImage ~= nil then
+	  spitem:setScrollImage(itemTable.scrollImage)
+   end
    
    spitem:setFuel(itemTable.fuel)
    
    if (itemTable.subItems ~= nil) then
 	  for _, subTable in pairs(itemTable.subItems) do
 		 local subItem = loadItem(subTable)
-		 spitem:addItem(subItem, false)
+		 if (subTable.slot ~= nil) then
+			spitem:insertItem(subTable.slot, subItem)
+		 else
+			spitem:addItem(subItem)
+		 end
 	  end
    end
    
@@ -115,8 +123,91 @@ function setLogLevel(level)
 	LOG_LEVEL = level
 end
 
+-- 1.3
+function directionFromPos(fromx, fromy, tox, toy)
+	local dx = tox - fromx
+	local dy = toy - fromy
+	return directionFromDelta(dx, dy)
+end
 
+function directionFromDelta(dx, dy)
+	if (dx > dy) then dy = 0; else dx = 0; end
 
+	if (dy < 0) then return 0; 
+	elseif (dx > 0) then return 1;
+	elseif (dy > 0) then return 2;
+	else return 3; end
+end
+
+function destroy(entity)
+	if (isItem(entity)) then
+		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
+			:where(function(i) return i.item == entity; end)		
+			:first()
+			
+		if (itemInInv ~= nil) then
+			itemInInv:destroy()
+		else
+			entity:destroy()
+		end
+	elseif (entity == party) then
+		gameover()
+	else
+		entity:destroy()
+	end
+end
+
+function find(id)
+	local entity = findEntity(id)
+	if (entity ~= nil) then
+		return entity
+	end
+	
+	return fromPartyInventory(true, inventory.all, true):where("id", id):first()
+end
+
+function replace(entity, entityToSpawn, desiredId)
+	if (isItem(entity)) then
+		local itemInInv = fromPartyInventoryEx(true, inventory.all, true)
+			:where(function(i) return i.item == entity; end)		
+			:first()
+			
+		if (itemInInv ~= nil) then
+			return itemInInv:replace(entityToSpawn, desiredId)
+		else
+			local alcoveOrContainer = from(entitiesAt(entity.level, entity.x, entity.y))
+				:where(isContainerOrAlcove)
+				:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
+				:first()
+				
+			if (alcoveOrContainer ~= nil) then
+				if (isAlcoveOrAltar(alcoveOrContainer)) then
+					entity:destroy()
+					local obj = spawn(entityToSpawn, nil, nil, nil, nil, desiredId)
+					alcoveOrContainer:addItem(obj)
+					return obj
+				else
+					local itemInInv = fromContainerItemEx(alcoveOrContainer)
+						:where(function(i) return i.item == entity; end)		
+						:first()					
+						
+					return itemInInv:replace(entityToSpawn, desiredId)
+				end
+			end
+		end
+	end
+	
+	local x = entity.x
+	local y = entity.y
+	local l = entity.level
+	local f = entity.facing
+	entity:destroy()
+	return spawn(entityToSpawn, l, x, y, f, desiredId)
+end
+
+function gameover()
+	damageTile(party.level, party.x, party.y, party.facing, 64, "physical", 100000000)
+end
 
 
 

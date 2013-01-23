@@ -18,6 +18,11 @@ end
 
 _banner()
 
+if (isWall == nil) then
+	loge("This version of GrimQ requires Legend of Grimrock 1.3.6 or later!")
+end
+
+
 if (USE_JKOS_FRAMEWORK) then
 	logi("Starting with jkos-fw integration, stage 1...")
 

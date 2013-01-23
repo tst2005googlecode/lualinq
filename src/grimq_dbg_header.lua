@@ -13,9 +13,6 @@
 -- CONFIGURATION OPTIONS                                                 --
 ---------------------------------------------------------------------------
 
--- CHANGE THIS ACCORDING TO YOUR DUNGEON!
-MAXLEVEL = 1
-
 -- change this if you don't want all secrets to be "auto"
 AUTO_ALL_SECRETS = false
 
@@ -34,4 +31,5 @@ LOG_PREFIX = "GrimQ: "
 ---------------------------------------------------------------------------
 
 VERSION_SUFFIX = ".DEBUG"
-
+MAXLEVEL = getMaxLevels()
+CONTAINERITEM_MAXSLOTS = 10

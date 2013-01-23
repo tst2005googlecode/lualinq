@@ -2,6 +2,8 @@
 -- LUALINQ GENERATORS
 -- ============================================================
 
+
+
 -- Returns a grimq structure containing all champions
 function fromChampions()
 	local collection = { }
@@ -74,37 +76,50 @@ function _createItemObject(_slotnumber, _item, _champion, _container, _ismouse, 
 		containerSlot = _containerSlot,
 		
 		destroy = function(self)
-			local destroyed = false
-			
 			if (self.container ~= nil) then
-				logi("itemObject couldn't be destroyed")
-				destroyed = false
+				self.container:removeItem(self.slot)
 			elseif (self.slot >= 0) then
 				self.champion:removeItem(self.slot)
-				destroyed = true
-			elseif (ismouse) then
+			elseif (self.ismouse) then
 				setMouseItem(nil)
-				destroyed = true
+			else
+				self.item:destroy()
 			end
-			return destroyed
+		end,
+				
+		replaceCallback = function(self, constructor)
+			local obj = nil
+			if (self.container ~= nil) then
+				self.container:removeItem(self.slot)
+				obj = constructor()
+				self.container:insertItem(self.slot, obj)
+			elseif (self.slot >= 0) then
+				self.champion:removeItem(self.slot)
+				obj = constructor()
+				self.champion:insertItem(self.slot, obj)
+			elseif (self.ismouse) then
+				setMouseItem(nil)
+				obj = constructor()
+				setMouseItem(obj)
+			else 
+				logw("itemobject.replace fallback on incompatible default")
+			end
+			return obj
 		end,
 		
-		replace = function(self, newitem, tryhard)
-			local done = false
-			if (self.container ~= nil) then
-				logi("itemObject couldn't be replaced")
-				done = false
-			elseif (self.slot >= 0) then
-				self.champion:removeItem(self.slot)
-				self.champion:insertItem(self.slot, newitem)
-				done = true
-			elseif (ismouse) then
-				setMouseItem(nil)
-				setMouseItem(newitem)
-			end
-			return done
-		end
+		replace = function(self, itemname, desiredid)
+			return self:replaceCallback(function() return spawn(itemname, nil, nil, nil, nil, desiredid); end)
+		end,
+		
 	}
+end
+
+function _appendContainerItem(collection, item, champion, containerslot)
+	for j = 1, CONTAINERITEM_MAXSLOTS do
+		if (item:getItem(j) ~= nil) then
+			table.insert(collection, _createItemObject(j, item:getItem(j), champion, item, false, containerslot))
+		end
+	end
 end
 
 -- Returns a grimq structure containing item objects in the champion's inventory
@@ -125,19 +140,30 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 			table.insert(collection, _createItemObject(i, item, champion, nil, false, -1))
 			
 			if (recurseIntoContainers) then
-				for subItem in item:containedItems() do			
-					table.insert(collection, _createItemObject(-1, subItem, champion, item, false, i))
-				end
+				_appendContainerItem(collection, item, champion, i)
 			end
 		end
 	end
 	
 	if (includeMouse and (getMouseItem() ~= nil)) then
-		table.insert(collection, _createItemObject(-1, getMouseItem(), nil, nil, true, -1))
+		local item = getMouseItem()
+		table.insert(collection, _createItemObject(-1, item, nil, nil, true, -1))
+		
+		if (recurseIntoContainers) then
+			_appendContainerItem(collection, item, nil, -1)
+		end
 	end
 	
 	return fromArrayInstance(collection)
 end
+
+
+function fromContainerItemEx(item)
+	local collection = { }
+	_appendContainerItem(collection, item, nil, -1)
+	return fromArrayInstance(collection)
+end
+
 
 -- Returns a grimq structure containing all the item-objects in the party inventory
 --		[recurseIntoContainers] => true, to recurse into sacks, crates, etc.
