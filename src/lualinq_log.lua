@@ -2,8 +2,8 @@
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.3.2"
-LIB_VERSION = 132
+LIB_VERSION_TEXT = "1.4"
+LIB_VERSION = 140
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then

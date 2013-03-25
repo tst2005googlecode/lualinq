@@ -10,22 +10,22 @@ function _activateAutos()
 	
 	logv("Starting auto-secrets... (AUTO_ALL_SECRETS is " .. tostring(AUTO_ALL_SECRETS) .. ")")
 	if (AUTO_ALL_SECRETS) then
-		fromAllEntitiesInWorld():where("name", "secret"):foreach(_initializeAutoSecret)
+		fromAllEntitiesInWorld("name", "secret"):foreach(_initializeAutoSecret)
 	else
-		fromAllEntitiesInWorld():where(match("id", "^auto_secret")):foreach(_initializeAutoSecret)
+		fromAllEntitiesInWorld(match("id", "^auto_secret")):foreach(_initializeAutoSecret)
 	end
 
 	logv("Starting auto-printers...")
-	fromAllEntitiesInWorld():where("name", "auto_printer"):foreach(_initializeAutoHudPrinter)
+	fromAllEntitiesInWorld("name", "auto_printer"):foreach(_initializeAutoHudPrinter)
 
 	logv("Starting auto-torches...")
-	fromAllEntitiesInWorld():where(match("name", "^auto_")):where(isTorchHolder):foreach(function(auto) if (not auto:hasTorch()) then auto:addTorch(); end; end)
+	fromAllEntitiesInWorld(isTorchHolder):where(match("name", "^auto_")):foreach(function(auto) if (not auto:hasTorch()) then auto:addTorch(); end; end)
 
 	logv("Starting auto-alcoves...")
-	fromAllEntitiesInWorld():where(match("name", "^auto_")):where(isAlcoveOrAltar):foreach(moveItemsFromTileToAlcove)
+	fromAllEntitiesInWorld(isAlcoveOrAltar):where(match("name", "^auto_")):foreach(moveItemsFromTileToAlcove)
 
 	logv("Starting autoexec scripts...")
-	fromAllEntitiesInWorld():where(isScript):foreach(_initializeAutoScript)
+	fromAllEntitiesInWorld(isScript):foreach(_initializeAutoScript)
 	
 	logi("Started.")
 end
@@ -55,11 +55,26 @@ end
 
 g_HudPrinters = { }
 
+g_HudPrintFunction = nil
+
+function setFunctionForHudPrint(fn)
+	g_HudPrintFunction = fn
+end
+
+function printHud(text)
+	if (g_HudPrintFunction == nil) then
+		hudPrint(strformat(text))
+	else
+		g_HudPrintFunction(strformat(text))
+	end
+end
+
 function execHudPrinter(source)
 	logv("Executing hudprinter " .. source.id)
 	local text = g_HudPrinters[source.id]
+	
 	if (text ~= nil) then
-		hudPrint(strformat(text))
+		printHud(text)
 	else
 		logw("Auto-hud-printer not found in hudprinters list: " .. source.id)
 	end
@@ -71,6 +86,29 @@ function _initializeAutoScript(ntt)
 		logv("Executing autoexec of " .. ntt.id .. "...)")
 		ntt:autoexec();
 	end
+	
+	if (ntt.auto_onStep ~= nil) then
+		logv("Install auto_onStep hook for " .. ntt.id .. "...)")
+		spawn("pressure_plate_hidden", ntt.level, ntt.x, ntt.y, ntt.facing)
+		:setTriggeredByParty(true)
+		:setTriggeredByMonster(false)
+		:setTriggeredByItem(false)
+		:setSilent(true)
+		:setActivateOnce(false)
+		:addConnector("activate", ntt.id, "auto_onStep")
+	end
+
+	if (ntt.auto_onStepOnce ~= nil) then
+		logv("Install auto_onStepOnce hook for " .. ntt.id .. "...)")
+		spawn("pressure_plate_hidden", ntt.level, ntt.x, ntt.y, ntt.facing)
+		:setTriggeredByParty(true)
+		:setTriggeredByMonster(false)
+		:setTriggeredByItem(false)
+		:setSilent(true)
+		:setActivateOnce(true)
+		:addConnector("activate", ntt.id, "auto_onStepOnce")
+	end
+	
 	
 	if (ntt.autohook ~= nil) then
 		if (fw == nil or (not USE_JKOS_FRAMEWORK)) then

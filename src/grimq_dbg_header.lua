@@ -14,22 +14,40 @@
 ---------------------------------------------------------------------------
 
 -- change this if you don't want all secrets to be "auto"
-AUTO_ALL_SECRETS = false
+AUTO_ALL_SECRETS = true
 
 -- integrate with jkos framework. Read docs before enabling it.
 USE_JKOS_FRAMEWORK = true
 
 -- how much log information is printed: 3 => verbose, 2 => info, 1 => only warning and errors, 0 => only errors, -1 => silent
-LOG_LEVEL = 2
+LOG_LEVEL = 1
 
 -- prefix for the printed logs
 LOG_PREFIX = "GrimQ: "
 
+-- set this to false when the allEntities bug gets fixed for faster iterations
+PATCH_ALLENTITIES_BUG = true
 
 ---------------------------------------------------------------------------
 -- IMPLEMENTATION BELOW, DO NOT CHANGE
 ---------------------------------------------------------------------------
 
 VERSION_SUFFIX = ".DEBUG"
-MAXLEVEL = getMaxLevels()
+MAXLEVEL = 1
 CONTAINERITEM_MAXSLOTS = 10
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

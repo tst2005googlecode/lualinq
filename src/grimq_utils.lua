@@ -25,7 +25,7 @@ function saveItem(item, slot)
 end
 
 -- loads an item from the table
-function loadItem(itemTable, level, x, y, facing, id)
+function loadItem(itemTable, level, x, y, facing, id, restoresubids)
    local spitem = nil
    if (level ~= nil) then
 	  spitem = spawn(itemTable.name, level, x, y, facing, id)
@@ -51,7 +51,12 @@ function loadItem(itemTable, level, x, y, facing, id)
    
    if (itemTable.subItems ~= nil) then
 	  for _, subTable in pairs(itemTable.subItems) do
-		 local subItem = loadItem(subTable)
+		 local subid = nil
+		 if (restoresubids) then
+			subid = subTable.id
+		 end
+	  
+		 local subItem = loadItem(subTable, nil, nil, nil, nil, subid, restoresubids)
 		 if (subTable.slot ~= nil) then
 			spitem:insertItem(subTable.slot, subItem)
 		 else
@@ -68,18 +73,32 @@ function copyItem(item)
 	return loadItem(saveItem(item))
 end
 
--- Moves an item to a container/alcove
-function moveFromFloorToContainer(alcove, item)
-	alcove:addItem(copyItem(item))
-	item:destroy()
+-- Moves an item, preserving id
+function moveItem(item, level, x, y, facing)
+	local saved = saveItem(item)
+	destroy(item)
+	return loadItem(saved, level, x, y, facing, saved.id, true)
 end
 
+-- Moves an item, preserving id, faster version if we know the item is in the world
+function moveItemFromFloor(item, level, x, y, facing)
+	local saved = saveItem(item)
+	item:destroy()
+	return loadItem(saved, level, x, y, facing, saved.id, true)
+end
+
+-- Moves an item to a container/alcove
+-- New 1.4: preserves ids
+function moveFromFloorToContainer(alcove, item)
+	alcove:addItem(moveItemFromFloor(item))
+end
+
+-- New 1.4: preserves ids
 function moveItemsFromTileToAlcove(alcove)
 	from(entitiesAt(alcove.level, alcove.x, alcove.y))
 		:where(isItem)
 		:foreach(function(i) 
-			alcove:addItem(copyItem(i)); 
-			i:destroy(); 
+			moveFromFloorToContainer(alcove, i)
 		end)
 end
 
@@ -146,8 +165,7 @@ function find(id)
 	entity = fromPartyInventory(true, inventory.all, true):where("id", id):first()
 	if (entity ~= nil) then	return entity; end
 	
-	local containers = fromAllEntitiesInWorld()
-				:where(isItem)
+	local containers = fromAllEntitiesInWorld(isItem)
 				:selectMany(function(i) return from(i:containedItems()):toArray(); end)
 	
 	entity = containers
@@ -177,7 +195,7 @@ function getEx(entity)
 	-- inventory failed, we try alcoves and containers
 	-- if we don't have an entity level, we in an obscure "item in sack in alcove" scenario
 	if (entity.level == nil) then
-		local topcontainers = fromAllEntitiesInWorld():where(isContainerOrAlcove)
+		local topcontainers = fromAllEntitiesInWorld(isContainerOrAlcove)
 		
 		local container = topcontainers
 						:where(function(a) return from(a:containedItems()):where(function(ii) return ii == entity; end):any(); end)
@@ -247,9 +265,7 @@ function findEx(entityid)
 		return nil
 	end
 	
-	local ex = getEx(entity)
-	
-	return ex
+	return getEx(entity)
 end
 
 function replace(entity, entityToSpawn, desiredId)
@@ -267,6 +283,91 @@ function destroy(entity)
 		ex:destroy()
 	end
 end
+
+function partyGainExp(amount)
+	grimq.fromAliveChampions():foreach(function(c) c:gainExp(amount); end)
+end
+
+
+function shuffleCoords(l, x, y, f, max)
+	local m = 17 * l + 5 * x + 13 * y - 7 * f
+	return (m % max) + 1
+end
+
+function randomReplacer(name, listOfReplace)
+	for o in fromAllEntitiesInWorld("name", name) do
+		local newname = listOfReplace[math.random(1, #listOfReplace)]
+		
+		if (newname ~= "") then
+			spawn(newname, o.level, o.x, o.y, o.facing)
+		end
+		o:destroy()
+	end
+end
+
+function decorateWalls(level, listOfDecorations, useRandomNumbers)
+	for x = -1, 32 do
+		for y = -1, 32 do
+			if (x < 0 or x > 31 or y < 0 or y > 31 or isWall(level, x, y)) then
+				for f = 0, 3 do
+					local dx, dy = getForward(f)
+					if (not isWall(level, x + dx, y + dy)) then
+						local rf = (f + 2) % 4
+						local hasdeco = grimq.from(entitiesAt(level, x + dx, y + dy)):where(function(o)
+							return ((o.facing == rf) or (string.find(o.name, "stairs") ~= nil)) and (not grimq.isItem(o)) and (not grimq.isMonster(o)) end):any()
+						
+						if (not hasdeco) then
+							local index = 1
+							
+							if (useRandomNumbers) then
+								index = math.random(1, #listOfDecorations)
+							else
+								index = shuffleCoords(level, x + dx, y + dy, rf, #listOfDecorations)
+							end
+							
+							local newname = listOfDecorations[index]
+							if (newname ~= "") then
+								if (type(newname) == "table") then
+									for _, w in ipairs(newname) do
+										spawn(w, level, x+dx, y+dy, rf)
+									end
+								else
+									spawn(newname, level, x+dx, y+dy, rf)
+								end
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+end
+
+
+function decorateOver(level, nameOverWhich, listOfDecorations, useRandomNumbers)
+	grimq.from(allEntities(level)):where("name", nameOverWhich):foreach(function(o)
+		local index = 1
+		
+		if (useRandomNumbers) then
+			index = math.random(1, #listOfDecorations)
+		else
+			index = shuffleCoords(level, o.x, o.y, o.facing, #listOfDecorations)
+		end
+		
+		local newname = listOfDecorations[index]
+		if (newname ~= "") then
+			if (type(newname) == "table") then
+				for _, w in ipairs(newname) do
+					spawn(w, level, o.x, o.y, o.facing)
+				end
+			else
+				spawn(newname, level, o.x, o.y, o.facing)
+			end
+		end
+	end)
+end
+
+
 
 
 

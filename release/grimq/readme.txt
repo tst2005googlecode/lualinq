@@ -1,5 +1,23 @@
 ChangeLog
 =========
+25-Mar-2013: Version 1.4
+	o GrimQ: NEW: moveItem and moveItemFromFloor to automagically move an item around
+	o GrimQ: NEW: partyGainExp(amount) function
+	o GrimQ: NEW: shuffleCoords(..) to generate "almost-random" numbers from a set of coordinates
+	o GrimQ: NEW: randomReplacer to replace all instances of an object with another chosen at random
+	o GrimQ: NEW: decorateWalls and decorateOver to automatically insert decorations in dungeons
+	o GrimQ: NEW: auto_onStep and auto_onStepOnce autos in scripting entities
+	o GrimQ: optional patch for allEntities bug in game engine (defaults at true) - thanks MarbleMouth!
+	o GrimQ: loadItem support restoring ids of items in containers
+	o GrimQ: fromAllEntitiesInWorld supports a where predicate in the function itself for optimizations
+	o GrimQ: autoprinters support overriding the function to use as hudPrint
+	o GrimQ: version check *SHOULD* work now. Or not, who knows ?
+	o GrimQ: fromAliveChampions() fixed
+	o GrimQ: fromEntitiesForward(),fromEntitiesInArea() and fromEntitiesAround() TONS of bugs fixed
+	o GrimQ: moveFromFloorToContainer and moveItemsFromTileToAlcove now preserve ids
+	o GrimQ: optimizations in find and getEx
+
+
 
 23-Jan-2013: Version 1.3.2
 	o GrimQ: Fixed (hopefully) all corner cases

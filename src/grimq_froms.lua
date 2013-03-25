@@ -2,8 +2,6 @@
 -- LUALINQ GENERATORS
 -- ============================================================
 
-
-
 -- Returns a grimq structure containing all champions
 function fromChampions()
 	local collection = { }
@@ -19,7 +17,7 @@ function fromAliveChampions()
 	for i = 1, 4 do
 		local c = party:getChampion(i)
 		if (c:isAlive() and c:getEnabled()) then
-			collection[i] = c
+			table.insert(collection, c) -- fixed in 1.5
 		end
 	end
 	return fromArrayInstance(collection)
@@ -196,15 +194,35 @@ function fromPartyInventoryEx(recurseIntoContainers, inventorySlots, includeMous
 	return fromChampions():selectMany(function(v) return fromChampionInventoryEx(v, recurseIntoContainers, inventorySlots, includeMouse):toArray(); end)
 end
 
--- Returns a grimq structure cotaining all the entities in the dungeon
-function fromAllEntitiesInWorld()
-	local itercoll = { }
-	
-	for i = 1, MAXLEVEL do
-		table.insert(itercoll, allEntities(i))
+-- Returns a grimq structure cotaining all the entities in the dungeon respecting a given *optional* condition
+function fromAllEntitiesInWorld(predicate, refvalue)
+	local result = { }
+
+	if (predicate == nil) then
+		for lvl = 1, MAXLEVEL do
+			for value in allEntities(lvl) do
+				table.insert(result, value)
+			end
+		end
+	elseif (type(predicate) == "function") then
+		for lvl = 1, MAXLEVEL do
+			for value in allEntities(lvl) do
+				if (predicate(value)) then
+					table.insert(result, value)
+				end				
+			end
+		end
+	else 
+		for lvl = 1, MAXLEVEL do
+			for value in allEntities(lvl) do
+				if (value[predicate] == refvalue) then
+					table.insert(result, value)
+				end
+			end
+		end
 	end
 	
-	return fromIteratorsArray(itercoll)
+	return fromArrayInstance(result)
 end
 
 -- Returns a grimq structure cotaining all the entities in an area
@@ -217,11 +235,11 @@ function fromEntitiesInArea(level, x1, y1, x2, y2, skipx, skipy)
 	if (x1 > x2) then stepx = -1; end
 
 	local stepy = 1
-	if (x1 > x2) then stepy = -1; end
+	if (y1 > y2) then stepy = -1; end
 	
 	for x = x1, x2, stepx do
 		for y = y1, y2, stepy do
-			if (skipx ~= x) and (skipy ~= y) then
+			if (skipx ~= x) or (skipy ~= y) then
 				table.insert(itercoll, entitiesAt(level, x, y))
 			end
 		end
@@ -247,9 +265,9 @@ function fromEntitiesForward(level, x, y, facing, distance, includeorigin)
 	local dy = dy * distance
 
 	if (includeorigin == nil) or (not includeorigin) then
-		return fromEntitiesInArea(x, y, x + dx, y + dy, x, y)
+		return fromEntitiesInArea(level, x, y, x + dx, y + dy, x, y)
 	else
-		return fromEntitiesInArea(x, y, x + dx, y + dy, x, y)
+		return fromEntitiesInArea(level, x, y, x + dx, y + dy, nil, nil)
 	end
 end
 

@@ -25,11 +25,14 @@ LOG_LEVEL = 0
 -- prefix for the printed logs
 LOG_PREFIX = "GrimQ: "
 
+-- set this to false when the allEntities bug gets fixed for faster iterations
+PATCH_ALLENTITIES_BUG = true
+
 
 ---------------------------------------------------------------------------
 -- IMPLEMENTATION BELOW, DO NOT CHANGE
 ---------------------------------------------------------------------------
 
 VERSION_SUFFIX = ""
-MAXLEVEL = getMaxLevels()
+MAXLEVEL = 1
 CONTAINERITEM_MAXSLOTS = 10
