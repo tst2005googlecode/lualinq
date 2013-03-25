@@ -7,7 +7,7 @@ ChangeLog
 	o GrimQ: NEW: randomReplacer to replace all instances of an object with another chosen at random
 	o GrimQ: NEW: decorateWalls and decorateOver to automatically insert decorations in dungeons
 	o GrimQ: NEW: auto_onStep and auto_onStepOnce autos in scripting entities
-	o GrimQ: optional patch for allEntities bug in game engine (defaults at true) - thanks MarbleMouth!
+	o GrimQ: automatic patch for allEntities bug in game engine (defaults at true) - thanks MarbleMouth!
 	o GrimQ: loadItem support restoring ids of items in containers
 	o GrimQ: fromAllEntitiesInWorld supports a where predicate in the function itself for optimizations
 	o GrimQ: autoprinters support overriding the function to use as hudPrint

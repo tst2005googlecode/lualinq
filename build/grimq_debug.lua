@@ -890,6 +890,13 @@ function fromEntitiesForward(level, x, y, facing, distance, includeorigin)
 	end
 end
 
+function fromAllEntities(level)
+	return grimq.from(allEntities(level))
+end
+
+
+
+
 -- ============================================================
 -- PREDICATES
 -- ============================================================
