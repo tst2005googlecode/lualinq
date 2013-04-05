@@ -111,6 +111,11 @@ function _initializeAutoScript(ntt)
 end
 	
 function _initializeAutoHooks(ntt)
+	if (ntt.autoexecfw ~= nil) then
+		logv("Executing autoexecfw of " .. ntt.id .. "...)")
+		ntt:autoexecfw();
+	end
+
 	if (ntt.autohook ~= nil) then
 		if (fw == nil) then
 			loge("_initializeAutoHooks called with nil fw ???.")

@@ -16,6 +16,9 @@
 -- change this if you don't want all secrets to be "auto"
 AUTO_ALL_SECRETS = true
 
+-- integrate with jkos framework. Read docs before enabling it.
+USE_JKOS_FRAMEWORK = false
+
 -- how much log information is printed: 3 => verbose, 2 => info, 1 => only warning and errors, 0 => only errors, -1 => silent
 LOG_LEVEL = 0
 

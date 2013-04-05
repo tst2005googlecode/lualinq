@@ -16,6 +16,9 @@
 -- change this if you don't want all secrets to be "auto"
 AUTO_ALL_SECRETS = true
 
+-- integrate with jkos framework. Read docs before enabling it.
+USE_JKOS_FRAMEWORK = true
+
 -- how much log information is printed: 3 => verbose, 2 => info, 1 => only warning and errors, 0 => only errors, -1 => silent
 LOG_LEVEL = 1
 
@@ -52,8 +55,8 @@ CONTAINERITEM_MAXSLOTS = 10
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.4.2"
-LIB_VERSION = 142
+LIB_VERSION_TEXT = "1.4.3"
+LIB_VERSION = 143
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
@@ -1529,6 +1532,11 @@ function _initializeAutoScript(ntt)
 end
 	
 function _initializeAutoHooks(ntt)
+	if (ntt.autoexecfw ~= nil) then
+		logv("Executing autoexecfw of " .. ntt.id .. "...)")
+		ntt:autoexecfw();
+	end
+
 	if (ntt.autohook ~= nil) then
 		if (fw == nil) then
 			loge("_initializeAutoHooks called with nil fw ???.")
@@ -1565,8 +1573,13 @@ end
 
 -- added by JKos
 function activate()
-	logi("Starting with jkos-fw bootstrap...")
-	grimq._activateJKosFw()
+	if (USE_JKOS_FRAMEWORK) then
+		logi("Starting with jkos-fw bootstrap...")
+		grimq._activateAutos()
+		grimq._activateJKosFw()
+	else
+		loge("JKOS FRAMEWORK DETECTED! Please, enable USE_JKOS_FRAMEWORK at the top of grimq script!");
+	end
 end
 
 _banner()
@@ -1575,7 +1588,7 @@ MAXLEVEL = getMaxLevels()
 
 if (isWall == nil) then
 	loge("This version of GrimQ requires Legend of Grimrock 1.3.6 or later!")
-else
+elseif (not USE_JKOS_FRAMEWORK) then 
 	logi("Starting with standard bootstrap...")
 
 	spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
