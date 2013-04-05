@@ -41,8 +41,8 @@ LOG_PREFIX = "LuaLinq: "
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.4.2"
-LIB_VERSION = 142
+LIB_VERSION_TEXT = "1.4.3"
+LIB_VERSION = 143
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
