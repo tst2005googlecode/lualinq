@@ -1,3 +1,7 @@
+VISIBLE = 2
+BLOCKED = 1
+NOTVISIBLE = 0
+
 function lineOfSightStraight(level, sx, sy, dx, dy, facing)
 	if (sx ~= dx and dy ~= sy) then return false; end
 	

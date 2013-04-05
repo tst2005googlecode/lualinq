@@ -200,13 +200,13 @@ function fromAllEntitiesInWorld(predicate, refvalue)
 
 	if (predicate == nil) then
 		for lvl = 1, MAXLEVEL do
-			for value in allEntities(lvl) do
+			for value in fromAllEntities(lvl):toIterator() do
 				table.insert(result, value)
 			end
 		end
 	elseif (type(predicate) == "function") then
 		for lvl = 1, MAXLEVEL do
-			for value in allEntities(lvl) do
+			for value in fromAllEntities(lvl):toIterator() do
 				if (predicate(value)) then
 					table.insert(result, value)
 				end				
@@ -214,7 +214,7 @@ function fromAllEntitiesInWorld(predicate, refvalue)
 		end
 	else 
 		for lvl = 1, MAXLEVEL do
-			for value in allEntities(lvl) do
+			for value in fromAllEntities(lvl):toIterator() do
 				if (value[predicate] == refvalue) then
 					table.insert(result, value)
 				end
@@ -272,7 +272,19 @@ function fromEntitiesForward(level, x, y, facing, distance, includeorigin)
 end
 
 function fromAllEntities(level)
-	return grimq.from(allEntities(level))
+	if (PATCH_ALLENTITIES_BUG) then
+		local result = { }
+		for i=0,31 do
+			for j=0,31 do
+				for k in entitiesAt(level,i,j) do
+					table.insert(result, k)
+				end
+			end
+		end		
+		return fromArrayInstance(result)
+	else
+		return grimq.from(allEntities(level))
+	end
 end
 
 

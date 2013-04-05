@@ -345,7 +345,7 @@ end
 
 
 function decorateOver(level, nameOverWhich, listOfDecorations, useRandomNumbers)
-	grimq.from(allEntities(level)):where("name", nameOverWhich):foreach(function(o)
+	grimq.fromAllEntities(level):where("name", nameOverWhich):foreach(function(o)
 		local index = 1
 		
 		if (useRandomNumbers) then

@@ -55,8 +55,8 @@ CONTAINERITEM_MAXSLOTS = 10
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.4"
-LIB_VERSION = 140
+LIB_VERSION_TEXT = "1.4.2"
+LIB_VERSION = 142
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
@@ -819,13 +819,13 @@ function fromAllEntitiesInWorld(predicate, refvalue)
 
 	if (predicate == nil) then
 		for lvl = 1, MAXLEVEL do
-			for value in allEntities(lvl) do
+			for value in fromAllEntities(lvl):toIterator() do
 				table.insert(result, value)
 			end
 		end
 	elseif (type(predicate) == "function") then
 		for lvl = 1, MAXLEVEL do
-			for value in allEntities(lvl) do
+			for value in fromAllEntities(lvl):toIterator() do
 				if (predicate(value)) then
 					table.insert(result, value)
 				end				
@@ -833,7 +833,7 @@ function fromAllEntitiesInWorld(predicate, refvalue)
 		end
 	else 
 		for lvl = 1, MAXLEVEL do
-			for value in allEntities(lvl) do
+			for value in fromAllEntities(lvl):toIterator() do
 				if (value[predicate] == refvalue) then
 					table.insert(result, value)
 				end
@@ -891,7 +891,19 @@ function fromEntitiesForward(level, x, y, facing, distance, includeorigin)
 end
 
 function fromAllEntities(level)
-	return grimq.from(allEntities(level))
+	if (PATCH_ALLENTITIES_BUG) then
+		local result = { }
+		for i=0,31 do
+			for j=0,31 do
+				for k in entitiesAt(level,i,j) do
+					table.insert(result, k)
+				end
+			end
+		end		
+		return fromArrayInstance(result)
+	else
+		return grimq.from(allEntities(level))
+	end
 end
 
 
@@ -1320,7 +1332,7 @@ end
 
 
 function decorateOver(level, nameOverWhich, listOfDecorations, useRandomNumbers)
-	grimq.from(allEntities(level)):where("name", nameOverWhich):foreach(function(o)
+	grimq.fromAllEntities(level):where("name", nameOverWhich):foreach(function(o)
 		local index = 1
 		
 		if (useRandomNumbers) then
@@ -1547,42 +1559,15 @@ end
 -- BOOTSTRAP CODE
 -- ============================================================
 
--- Thanks marble mouth for this: http://www.grimrock.net/forum/viewtopic.php?f=14&t=5028&p=53889#p53889
-function allEntities_patched(level)
-	local s = {}
-	s["offset"] = 0
-	local c = 0
-	for i=0,31 do
-		for j=0,31 do
-			for k in entitiesAt(level,i,j) do
-				c = c + 1
-				s[c] = k
-			end
-		end
-	end
-
-	local f = function ( s , v )
-		local offset = s["offset"] + 1
-		s["offset"] = offset
-		return s[offset]
-	end
-
-	return f , s , nil
-end
-
-
 function _banner()
 	logi("GrimQ Version " .. LIB_VERSION_TEXT .. VERSION_SUFFIX .. " - Marco Mastropaolo (Xanathar)")
 end
 
-function _jkosAutoStart()
-	logi("Starting with jkos-fw integration, stage 2...")
-	
-	timers:setLevels(MAXLEVEL) 
-	fw.debug.enabled = (LOG_LEVEL > 0)
-	fwInit:close() 
-
-	_activateAutos()
+-- added by JKos
+function activate()
+	USE_JKOS_FRAMEWORK = true
+	MAXLEVEL = getMaxLevels()
+	grimq._activateAutos()
 end
 
 _banner()
@@ -1592,30 +1577,7 @@ if (isWall == nil) then
 else
 	MAXLEVEL = getMaxLevels()
 
-	if (PATCH_ALLENTITIES_BUG) then
-		allEntities = allEntities_patched
-	end
-
-	if (USE_JKOS_FRAMEWORK) then
-		logi("Starting with jkos-fw integration, stage 1...")
-
-		spawn("script_entity", party.level, 1, 1, 0, "logfw_init")
-			:setSource([[
-				function main()
-				end
-			]])
-			
-		spawn("LoGFramework", party.level,1,1,0,'fwInit')
-		fwInit:open() 
-
-		spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
-			:setTriggeredByParty(true)
-			:setTriggeredByMonster(false)
-			:setTriggeredByItem(false)
-			:setActivateOnce(true)
-			:setSilent(true)
-			:addConnector("activate", "grimq", "_jkosAutoStart")
-	else
+	if (not USE_JKOS_FRAMEWORK) then
 		logi("Starting with standard bootstrap...")
 
 		spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
