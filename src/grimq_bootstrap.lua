@@ -8,29 +8,26 @@ end
 
 -- added by JKos
 function activate()
-	USE_JKOS_FRAMEWORK = true
-	MAXLEVEL = getMaxLevels()
-	grimq._activateAutos()
+	logi("Starting with jkos-fw bootstrap...")
+	grimq._activateJKosFw()
 end
 
 _banner()
 
+MAXLEVEL = getMaxLevels()
+
 if (isWall == nil) then
 	loge("This version of GrimQ requires Legend of Grimrock 1.3.6 or later!")
 else
-	MAXLEVEL = getMaxLevels()
+	logi("Starting with standard bootstrap...")
 
-	if (not USE_JKOS_FRAMEWORK) then
-		logi("Starting with standard bootstrap...")
-
-		spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
-			:setTriggeredByParty(true)
-			:setTriggeredByMonster(false)
-			:setTriggeredByItem(false)
-			:setActivateOnce(true)
-			:setSilent(true)
-			:addConnector("activate", "grimq", "_activateAutos")
-	end
+	spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
+		:setTriggeredByParty(true)
+		:setTriggeredByMonster(false)
+		:setTriggeredByItem(false)
+		:setActivateOnce(true)
+		:setSilent(true)
+		:addConnector("activate", "grimq", "_activateAutos")
 end
 
 

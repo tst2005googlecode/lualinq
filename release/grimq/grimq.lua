@@ -16,9 +16,6 @@
 -- change this if you don't want all secrets to be "auto"
 AUTO_ALL_SECRETS = true
 
--- integrate with jkos framework. Read docs before enabling it.
-USE_JKOS_FRAMEWORK = false
-
 -- how much log information is printed: 3 => verbose, 2 => info, 1 => only warning and errors, 0 => only errors, -1 => silent
 LOG_LEVEL = 0
 
@@ -1514,11 +1511,12 @@ function _initializeAutoScript(ntt)
 		:setActivateOnce(true)
 		:addConnector("activate", ntt.id, "auto_onStepOnce")
 	end
+end
 	
-	
+function _initializeAutoHooks(ntt)
 	if (ntt.autohook ~= nil) then
-		if (fw == nil or (not USE_JKOS_FRAMEWORK)) then
-			loge("Can't install autohooks in ".. ntt.id .. " -> JKos framework not found or USE_JKOS_FRAMEWORK is false.")
+		if (fw == nil) then
+			loge("_initializeAutoHooks called with nil fw ???.")
 			return
 		end
 
@@ -1535,7 +1533,9 @@ function _initializeAutoScript(ntt)
 	end
 end
 
-
+function _activateJKosFw()
+	fromAllEntitiesInWorld(isScript):foreach(_initializeAutoHooks)
+end
 
 
 
@@ -1550,29 +1550,26 @@ end
 
 -- added by JKos
 function activate()
-	USE_JKOS_FRAMEWORK = true
-	MAXLEVEL = getMaxLevels()
-	grimq._activateAutos()
+	logi("Starting with jkos-fw bootstrap...")
+	grimq._activateJKosFw()
 end
 
 _banner()
 
+MAXLEVEL = getMaxLevels()
+
 if (isWall == nil) then
 	loge("This version of GrimQ requires Legend of Grimrock 1.3.6 or later!")
 else
-	MAXLEVEL = getMaxLevels()
+	logi("Starting with standard bootstrap...")
 
-	if (not USE_JKOS_FRAMEWORK) then
-		logi("Starting with standard bootstrap...")
-
-		spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
-			:setTriggeredByParty(true)
-			:setTriggeredByMonster(false)
-			:setTriggeredByItem(false)
-			:setActivateOnce(true)
-			:setSilent(true)
-			:addConnector("activate", "grimq", "_activateAutos")
-	end
+	spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
+		:setTriggeredByParty(true)
+		:setTriggeredByMonster(false)
+		:setTriggeredByItem(false)
+		:setActivateOnce(true)
+		:setSilent(true)
+		:addConnector("activate", "grimq", "_activateAutos")
 end
 
 

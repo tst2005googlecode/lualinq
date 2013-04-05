@@ -108,11 +108,12 @@ function _initializeAutoScript(ntt)
 		:setActivateOnce(true)
 		:addConnector("activate", ntt.id, "auto_onStepOnce")
 	end
+end
 	
-	
+function _initializeAutoHooks(ntt)
 	if (ntt.autohook ~= nil) then
-		if (fw == nil or (not USE_JKOS_FRAMEWORK)) then
-			loge("Can't install autohooks in ".. ntt.id .. " -> JKos framework not found or USE_JKOS_FRAMEWORK is false.")
+		if (fw == nil) then
+			loge("_initializeAutoHooks called with nil fw ???.")
 			return
 		end
 
@@ -129,7 +130,9 @@ function _initializeAutoScript(ntt)
 	end
 end
 
-
+function _activateJKosFw()
+	fromAllEntitiesInWorld(isScript):foreach(_initializeAutoHooks)
+end
 
 
 
