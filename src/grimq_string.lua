@@ -46,4 +46,14 @@ function strmatch(value, pattern)
 	return string.find(value, pattern) ~= nil
 end
 
+function strlines(str)
+	local count = 0 
+    local byte_char = string.byte("\n")
+    for i = 1, #str do
+        if string.byte(str, i) == byte_char then
+            count = count + 1 
+        end 
+    end 
+    return count + 1
+end
 

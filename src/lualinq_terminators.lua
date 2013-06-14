@@ -61,6 +61,12 @@ function _count(self, predicate)
 	return false
 end
 
+
+-- Prints debug data.
+function _dump(self)
+	print(_dumpData(self));
+end
+
 -- Returns a random item in the collection, or default if no items are present
 function _random(self, default)
 	if (#self.m_Data == 0) then return default; end
@@ -80,11 +86,21 @@ function _contains(self, item, comparator)
 end
 
 
--- Calls the action for each item in the collection. Action takes 1 parameter: the item value
-function _foreach(self, action)
-	for idx, value in ipairs(self.m_Data) do
-		action(value)
+-- Calls the action for each item in the collection. Action takes 1 parameter: the item value.
+-- If the action is a string, it calls that method with the additional parameters
+function _foreach(self, action, ...)
+	if (type(action) == "function") then
+		for idx, value in ipairs(self.m_Data) do
+			action(value, from({...}):toTuple())
+		end
+	elseif (type(action) == "string") then
+		for idx, value in ipairs(self.m_Data) do
+			value[action](value, from({...}):toTuple())
+		end
+	else
+		loge("foreach called with unknown action type");
 	end
+
 	
 	return self
 end
@@ -148,3 +164,18 @@ function _average(self, selector)
 		return 0
 	end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

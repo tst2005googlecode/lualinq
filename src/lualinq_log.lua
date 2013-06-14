@@ -2,8 +2,12 @@
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.4.3"
-LIB_VERSION = 143
+LIB_VERSION_TEXT = "1.5.1"
+LIB_VERSION = 151
+
+function setLogLevel(level)
+	LOG_LEVEL = level;
+end
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
@@ -13,27 +17,33 @@ end
 
 function logq(self, method)
 	if (LOG_LEVEL >= 3) then
-		local items = #self.m_Data
-		local dumpdata = "{ "
-		
-		for i = 1, 3 do
-			if (i <= items) then
-				if (i ~= 1) then
-					dumpdata = dumpdata .. ", "
-				end
-				dumpdata = dumpdata .. tostring(self.m_Data[i])
-			end
-		end
-		
-		if (items > 3) then
-			dumpdata = dumpdata .. ", ... }"
-		else
-			dumpdata = dumpdata .. " }"
-		end
-	
-		logv("after " .. method .. " => " .. items .. " items : " .. dumpdata)
+		logv("after " .. method .. " => " .. #self.m_Data .. " items : " .. _dumpData(self))
 	end
 end
+
+function _dumpData(self)
+	local items = #self.m_Data
+	local dumpdata = "q{ "
+	
+	for i = 1, 3 do
+		if (i <= items) then
+			if (i ~= 1) then
+				dumpdata = dumpdata .. ", "
+			end
+			dumpdata = dumpdata .. tostring(self.m_Data[i])
+		end
+	end
+	
+	if (items > 3) then
+		dumpdata = dumpdata .. ", ..." .. items .. " }"
+	else
+		dumpdata = dumpdata .. " }"
+	end
+
+	return dumpdata
+end
+
+
 
 function logv(txt)
 	_log(3, "[..] ", txt)

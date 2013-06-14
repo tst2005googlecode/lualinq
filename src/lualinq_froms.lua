@@ -76,6 +76,18 @@ function fromIteratorsArray(iteratorArray)
 	return _new_lualinq("fromIteratorsArray", collection)
 end
 
+-- Creates a linq data structure from a table of keys, values ignored
+function fromSet(set)
+	local collection = { }
+
+	for k,v in pairs(set) do
+		table.insert(collection, k)
+	end
+	
+	return _new_lualinq("fromIteratorsArray", collection)
+end
+
+
 -- Creates an empty linq data structure
 function fromNothing()
 	return _new_lualinq("fromNothing", { } )

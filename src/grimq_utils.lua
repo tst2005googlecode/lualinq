@@ -26,6 +26,10 @@ end
 
 -- loads an item from the table
 function loadItem(itemTable, level, x, y, facing, id, restoresubids)
+	if (tonumber(id) ~= nil) then
+		id = nil
+	end
+
    local spitem = nil
    if (level ~= nil) then
 	  spitem = spawn(itemTable.name, level, x, y, facing, id)
@@ -158,26 +162,28 @@ function directionFromDelta(dx, dy)
 	else return 3; end
 end
 
-function find(id)
+function find(id, ignoreCornerCases)
 	local entity = findEntity(id)
 	if (entity ~= nil) then	return entity; end
 	
 	entity = fromPartyInventory(true, inventory.all, true):where("id", id):first()
 	if (entity ~= nil) then	return entity; end
 	
-	local containers = fromAllEntitiesInWorld(isItem)
-				:selectMany(function(i) return from(i:containedItems()):toArray(); end)
-	
-	entity = containers
-		:where(function(ii) return ii.id == id; end)
-		:first()
-	
-	if (entity ~= nil) then	return entity; end
+	if (not ignoreCornerCases) then
+		local containers = fromAllEntitiesInWorld(isItem)
+					:selectMany(function(i) return from(i:containedItems()):toArray(); end)
 		
-	entity = containers
-		:selectMany(function(i) return from(i:containedItems()):toArray(); end)
-		:where(function(ii) return ii.id == id; end)
-		:first()
+		entity = containers
+			:where(function(ii) return ii.id == id; end)
+			:first()
+	
+		if (entity ~= nil) then	return entity; end
+		
+		entity = containers
+			:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+			:where(function(ii) return ii.id == id; end)
+			:first()
+	end
 		
 	return entity
 end
@@ -367,9 +373,61 @@ function decorateOver(level, nameOverWhich, listOfDecorations, useRandomNumbers)
 	end)
 end
 
+function partyDist(x, y)
+	return math.abs(party.x - x) + math.abs(party.y - y)
+end
 
 
+function spawnSmart(level, spawners, spawnedEntityNames, maxEntities, minDistance)
+	minDistance = minDistance or 7;
+	
+	local count = grimq.fromAllEntities(level)
+		:where(grimq.isMonster)
+		:intersectionby("name", spawnedEntityNames)
+		:count();
 
+	if count >= maxEntities then
+		return 0;
+	end
+	
+	local spawner = spawners[math.random(1, #spawners)]
+	
+	local dist = partyDist(spawner.x, spawner.y)
+	
+	if dist < minDistance then
+		return 0;
+	end
+	
+	spawner:activate()
+	return 1;
+end	
+	
+function replaceMonster(m, newname)
+	local x = m.x
+	local y = m.y
+	local f = m.facing
+	local l = m.level
+	local id = m.id
+	local hp = m:getHealth()
+	local lvl = m:getLevel()
+	
+	if (tonumber(id) ~= nil) then
+		id = nil
+	end
+	
+	if (hp > 0) then
+		m:destroy()
+		spawn(newname, l, x, y, f, id)
+			:setLevel(lvl)
+			:setHealth(hp)
+	end
+end
+
+function spawnOver(entity, spawnname, overridefacing)
+	local facing = overridefacing or entity.facing;
+	
+	spawn(spawnname, entity.level, entity.x, entity.y, facing);
+end
 
 
 

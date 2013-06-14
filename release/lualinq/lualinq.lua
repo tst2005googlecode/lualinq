@@ -41,8 +41,12 @@ LOG_PREFIX = "LuaLinq: "
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.4.3"
-LIB_VERSION = 143
+LIB_VERSION_TEXT = "1.5.1"
+LIB_VERSION = 151
+
+function setLogLevel(level)
+	LOG_LEVEL = level;
+end
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
@@ -52,27 +56,33 @@ end
 
 function logq(self, method)
 	if (LOG_LEVEL >= 3) then
-		local items = #self.m_Data
-		local dumpdata = "{ "
-		
-		for i = 1, 3 do
-			if (i <= items) then
-				if (i ~= 1) then
-					dumpdata = dumpdata .. ", "
-				end
-				dumpdata = dumpdata .. tostring(self.m_Data[i])
-			end
-		end
-		
-		if (items > 3) then
-			dumpdata = dumpdata .. ", ... }"
-		else
-			dumpdata = dumpdata .. " }"
-		end
-	
-		logv("after " .. method .. " => " .. items .. " items : " .. dumpdata)
+		logv("after " .. method .. " => " .. #self.m_Data .. " items : " .. _dumpData(self))
 	end
 end
+
+function _dumpData(self)
+	local items = #self.m_Data
+	local dumpdata = "q{ "
+	
+	for i = 1, 3 do
+		if (i <= items) then
+			if (i ~= 1) then
+				dumpdata = dumpdata .. ", "
+			end
+			dumpdata = dumpdata .. tostring(self.m_Data[i])
+		end
+	end
+	
+	if (items > 3) then
+		dumpdata = dumpdata .. ", ..." .. items .. " }"
+	else
+		dumpdata = dumpdata .. " }"
+	end
+
+	return dumpdata
+end
+
+
 
 function logv(txt)
 	_log(3, "[..] ", txt)
@@ -99,7 +109,7 @@ end
 function _new_lualinq(method, collection)
 	local self = { }
 	
-	self.classid_71cd970f_a742_4316_938d_1998df001335 = 1
+	self.classid_71cd970f_a742_4316_938d_1998df001335 = 2
 	
 	self.m_Data = collection
 	
@@ -116,6 +126,10 @@ function _new_lualinq(method, collection)
 	self.union = _union
 	self.except = _except
 	self.intersection = _intersection
+	self.exceptby = _exceptby
+	self.intersectionby = _intersectionby
+	self.exceptBy = _exceptby
+	self.intersectionBy = _intersectionby
 
 	self.first = _first
 	self.last = _last
@@ -131,6 +145,8 @@ function _new_lualinq(method, collection)
 	self.sum = _sum
 	self.average = _average
 
+	self.dump = _dump
+	
 	self.map = _map
 	self.foreach = _foreach
 	self.xmap = _xmap
@@ -138,6 +154,14 @@ function _new_lualinq(method, collection)
 	self.toArray = _toArray
 	self.toDictionary = _toDictionary
 	self.toIterator = _toIterator
+	self.toTuple = _toTuple
+
+	-- shortcuts
+	self.each = _foreach
+	self.intersect = _intersection
+	self.intersectby = _intersectionby
+	self.intersectBy = _intersectionby
+	
 	
 	logq(self, "from")
 
@@ -221,6 +245,18 @@ function fromIteratorsArray(iteratorArray)
 	return _new_lualinq("fromIteratorsArray", collection)
 end
 
+-- Creates a linq data structure from a table of keys, values ignored
+function fromSet(set)
+	local collection = { }
+
+	for k,v in pairs(set) do
+		table.insert(collection, k)
+	end
+	
+	return _new_lualinq("fromIteratorsArray", collection)
+end
+
+
 -- Creates an empty linq data structure
 function fromNothing()
 	return _new_lualinq("fromNothing", { } )
@@ -255,15 +291,16 @@ function _select(self, selector)
 				table.insert(result, newvalue)
 			end
 		end
-	else 
+	elseif (type(selector) == "string") then
 		for idx, value in ipairs(self.m_Data) do
 			local newvalue = value[selector]
 			if (newvalue ~= nil) then
 				table.insert(result, newvalue)
 			end
 		end
-	end
-	
+	else
+		loge("select called with unknown predicate type");
+	end	
 	return _new_lualinq(":select", result)
 end
 
@@ -286,26 +323,45 @@ function _selectMany(self, selector)
 	return _new_lualinq(":selectMany", result)
 end
 
+
 -- Returns a linq data structure where only items for whose the predicate has returned true are included
-function _where(self, predicate, refvalue)
+function _where(self, predicate, refvalue, ...)
 	local result = { }
 
 	if (type(predicate) == "function") then
 		for idx, value in ipairs(self.m_Data) do
-			if (predicate(value)) then
+			if (predicate(value, refvalue, from({...}):toTuple())) then
 				table.insert(result, value)
 			end
 		end	
-	else 
-		for idx, value in ipairs(self.m_Data) do
-			if (value[predicate] == refvalue) then
-				table.insert(result, value)
-			end
-		end	
+	elseif (type(predicate) == "string") then
+		local refvals = {...}
+		
+		if (#refvals > 0) then
+			table.insert(refvals, refvalue);
+			return _intersectionby(self, predicate, refvals);
+		elseif (refvalue ~= nil) then
+			for idx, value in ipairs(self.m_Data) do
+				if (value[predicate] == refvalue) then
+					table.insert(result, value)
+				end
+			end	
+		else
+			for idx, value in ipairs(self.m_Data) do
+				if (value[predicate] ~= nil) then
+					table.insert(result, value)
+				end
+			end	
+		end
+	else
+		loge("where called with unknown predicate type");
 	end
 	
 	return _new_lualinq(":where", result)
 end
+
+
+
 
 -- Returns a linq data structure where only items for whose the predicate has returned true are included, indexed version
 function _whereIndex(self, predicate)
@@ -387,6 +443,18 @@ function _intersection(self, other, comparator)
 	return self:where(function (v) return other:contains(v, comparator) end)
 end
 
+-- Returns the difference of two collections, using a property accessor
+function _exceptby(self, property, other)
+	other = from(other)
+	return self:where(function (v) return not other:contains(v[property]) end)
+end
+
+-- Returns the intersection of two collections, using a property accessor
+function _intersectionby(self, property, other)
+	other = from(other)
+	return self:where(function (v) return other:contains(v[property]) end)
+end
+
 -- ============================================================
 -- CONVERSION METHODS
 -- ============================================================
@@ -419,6 +487,14 @@ function _toDictionary(self, keyValueSelector)
 	
 	return result
 end
+
+-- Converts the lualinq struct to a tuple
+function _toTuple(self)
+	return unpack(self.m_Data)
+end
+
+
+
 
 -- ============================================================
 -- TERMINATING METHODS
@@ -483,6 +559,12 @@ function _count(self, predicate)
 	return false
 end
 
+
+-- Prints debug data.
+function _dump(self)
+	print(_dumpData(self));
+end
+
 -- Returns a random item in the collection, or default if no items are present
 function _random(self, default)
 	if (#self.m_Data == 0) then return default; end
@@ -502,11 +584,21 @@ function _contains(self, item, comparator)
 end
 
 
--- Calls the action for each item in the collection. Action takes 1 parameter: the item value
-function _foreach(self, action)
-	for idx, value in ipairs(self.m_Data) do
-		action(value)
+-- Calls the action for each item in the collection. Action takes 1 parameter: the item value.
+-- If the action is a string, it calls that method with the additional parameters
+function _foreach(self, action, ...)
+	if (type(action) == "function") then
+		for idx, value in ipairs(self.m_Data) do
+			action(value, from({...}):toTuple())
+		end
+	elseif (type(action) == "string") then
+		for idx, value in ipairs(self.m_Data) do
+			value[action](value, from({...}):toTuple())
+		end
+	else
+		loge("foreach called with unknown action type");
 	end
+
 	
 	return self
 end
@@ -570,3 +662,18 @@ function _average(self, selector)
 		return 0
 	end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

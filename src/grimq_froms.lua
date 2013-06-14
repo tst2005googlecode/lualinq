@@ -2,6 +2,20 @@
 -- LUALINQ GENERATORS
 -- ============================================================
 
+-- Returns a grimq structure filled with names of entities contained
+-- in one of the fw sets.
+function fromFwSet(listname, sublistname)
+	local set = fw.lists[listname];
+	
+	if (set ~= nil) and (sublistname ~= nil) then
+		set = set[sublistname];
+	end
+	
+	return fromSet(set);
+end
+
+
+
 -- Returns a grimq structure containing all champions
 function fromChampions()
 	local collection = { }
@@ -133,10 +147,10 @@ function _createExtEntity(_slotnumber, _entity, _champion, _container, _ismouse,
 end
 
 function _appendContainerItem(collection, item, champion, containerslot)
-	print("appending contents of container " .. item.id)
+	--print("appending contents of container " .. item.id)
 	for j = 1, CONTAINERITEM_MAXSLOTS do
 		if (item:getItem(j) ~= nil) then
-			print("  appended " .. item:getItem(j).id)
+			--print("  appended " .. item:getItem(j).id)
 			table.insert(collection, _createExtEntity(j, item:getItem(j), champion, item, false, containerslot))
 			_appendContainerItem(collection, item:getItem(j), nil, j)
 		end
@@ -154,7 +168,8 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 	end
 
 	local collection = { }
-	for i = 1, #inventorySlots do
+	for idx = 1, #inventorySlots do
+		local i = inventorySlots[idx];
 		local item = champion:getItem(i)
 		
 		if (item ~= nil) then
@@ -195,7 +210,7 @@ function fromPartyInventoryEx(recurseIntoContainers, inventorySlots, includeMous
 end
 
 -- Returns a grimq structure cotaining all the entities in the dungeon respecting a given *optional* condition
-function fromAllEntitiesInWorld(predicate, refvalue)
+function fromAllEntitiesInWorld(predicate, refvalue, ...)
 	local result = { }
 
 	if (predicate == nil) then
@@ -213,10 +228,26 @@ function fromAllEntitiesInWorld(predicate, refvalue)
 			end
 		end
 	else 
-		for lvl = 1, MAXLEVEL do
-			for value in fromAllEntities(lvl):toIterator() do
-				if (value[predicate] == refvalue) then
-					table.insert(result, value)
+		local refvals = {...}
+		
+		if (#refvals > 0) then
+			local refset = { }
+			for _, l in ipairs(refvals) do refset[l] = true; end
+			refset[refvalue] = true;
+		
+			for lvl = 1, MAXLEVEL do
+				for value in fromAllEntities(lvl):toIterator() do
+					if (refset[value[predicate]]) then
+						table.insert(result, value)
+					end
+				end
+			end
+		else
+			for lvl = 1, MAXLEVEL do
+				for value in fromAllEntities(lvl):toIterator() do
+					if (value[predicate] == refvalue) then
+						table.insert(result, value)
+					end
 				end
 			end
 		end

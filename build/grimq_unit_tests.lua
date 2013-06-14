@@ -160,7 +160,7 @@ function autoexec()
 			:select("say")
 			:foreach(assertArray)
 	assertArrayEnd()
-
+	
 	if (allok) then
 		print("ALL TESTS PASSED!")
 	end

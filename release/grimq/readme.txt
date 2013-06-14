@@ -1,5 +1,24 @@
 ChangeLog
 =========
+05-May-2013: Version 1.5
+	o GrimQ: Now GrimQ *NEEDS* jkos framework around to work (as such old bootstrap code has been removed)
+	o GrimQ: fromFwSet(listname, sublistname) returns a collection with one of fw sets of names
+	o GrimQ: loadItem fixed when restoring old ids (but really, don't rely on items ids. please)
+	o GrimQ: addded spawnSmart to implement smart spawner sets
+	o GrimQ: added partyDist utility function
+	o GrimQ: fixed a bug where inventory functions printed information on the console
+	o GrimQ: fixed a bug where inventory functions ignored inventory slots information
+	o GrimQ: fromAllEntitiesInWorld now supports extra syntax like lualinq where (see below)
+	o LuaLinq: toTuple() converts a lua linq structure to a tuple
+	o LuaLinq: added exceptby and intersectionby methods
+	o LuaLinq: added dump to debug data interactively
+	o LuaLinq: added some shortcuts for foreach and other methods with longish names
+	o LuaLinq: fromSet creates a structure from a set (table where only the key matters)
+	o LuaLinq: where can take multiple possible reference values, or parameters which will be passed to the predicate
+	o LuaLinq: foreach now accepts a string to call a method of the object itself. Also, in both modes (string or function) it 
+				accepts extra parameters which will be relayed to the method/function
+
+
 25-Mar-2013: Version 1.4
 	o GrimQ: NEW: moveItem and moveItemFromFloor to automagically move an item around
 	o GrimQ: NEW: partyGainExp(amount) function

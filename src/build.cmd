@@ -10,9 +10,9 @@ copy /B /Y "%TEMP%\lualinq_temp.lua" +grimq_enums.lua +grimq_froms.lua +grimq_pr
 
 copy /B /Y grimq_header.lua +"%TEMP%\grimq_temp.lua" ..\build\grimq.lua
 
-copy /B /Y grimq_dbg_header.lua +"%TEMP%\grimq_temp.lua" +grimqunit.lua ..\build\grimq_debug.lua
+copy /B /Y grimq_dbg_header.lua +"%TEMP%\grimq_temp.lua"  ..\build\grimq_debug.lua
 
-copy /B /Y grimq_header.lua +"%TEMP%\lualinq_temp.lua" +grimq_enums.lua +grimq_froms.lua +grimq_predicates.lua +grimq_utils.lua +grimq_string.lua +grimq_auto.lua +grimq_bootstrap.lua ..\build\grimq.lua
+copy /B /Y grimq_fw_header.lua +"%TEMP%\grimq_temp.lua" +grimq_fw_footer.lua ..\build\grimq_fw.lua
 
 copy grimqobjects.lua ..\build\grimqobjects.lua
 
@@ -24,6 +24,7 @@ rem this copies the content of the file to the clipboard - http://www.mastropaol
 txt2clip build\grimq_debug.lua
 
 copy build\grimq.lua release\grimq
+copy build\grimq_fw.lua release\grimq\framework\grimq.lua
 copy build\lualinq.lua release\lualinq
 copy docs\readme.txt release\lualinq
 copy docs\readme.txt release\grimq

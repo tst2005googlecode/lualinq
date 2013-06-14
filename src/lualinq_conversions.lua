@@ -31,3 +31,11 @@ function _toDictionary(self, keyValueSelector)
 	return result
 end
 
+-- Converts the lualinq struct to a tuple
+function _toTuple(self)
+	return unpack(self.m_Data)
+end
+
+
+
+

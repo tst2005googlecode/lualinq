@@ -27,15 +27,16 @@ function _select(self, selector)
 				table.insert(result, newvalue)
 			end
 		end
-	else 
+	elseif (type(selector) == "string") then
 		for idx, value in ipairs(self.m_Data) do
 			local newvalue = value[selector]
 			if (newvalue ~= nil) then
 				table.insert(result, newvalue)
 			end
 		end
-	end
-	
+	else
+		loge("select called with unknown predicate type");
+	end	
 	return _new_lualinq(":select", result)
 end
 
@@ -58,26 +59,45 @@ function _selectMany(self, selector)
 	return _new_lualinq(":selectMany", result)
 end
 
+
 -- Returns a linq data structure where only items for whose the predicate has returned true are included
-function _where(self, predicate, refvalue)
+function _where(self, predicate, refvalue, ...)
 	local result = { }
 
 	if (type(predicate) == "function") then
 		for idx, value in ipairs(self.m_Data) do
-			if (predicate(value)) then
+			if (predicate(value, refvalue, from({...}):toTuple())) then
 				table.insert(result, value)
 			end
 		end	
-	else 
-		for idx, value in ipairs(self.m_Data) do
-			if (value[predicate] == refvalue) then
-				table.insert(result, value)
-			end
-		end	
+	elseif (type(predicate) == "string") then
+		local refvals = {...}
+		
+		if (#refvals > 0) then
+			table.insert(refvals, refvalue);
+			return _intersectionby(self, predicate, refvals);
+		elseif (refvalue ~= nil) then
+			for idx, value in ipairs(self.m_Data) do
+				if (value[predicate] == refvalue) then
+					table.insert(result, value)
+				end
+			end	
+		else
+			for idx, value in ipairs(self.m_Data) do
+				if (value[predicate] ~= nil) then
+					table.insert(result, value)
+				end
+			end	
+		end
+	else
+		loge("where called with unknown predicate type");
 	end
 	
 	return _new_lualinq(":where", result)
 end
+
+
+
 
 -- Returns a linq data structure where only items for whose the predicate has returned true are included, indexed version
 function _whereIndex(self, predicate)
@@ -157,5 +177,17 @@ end
 function _intersection(self, other, comparator)
 	other = from(other)
 	return self:where(function (v) return other:contains(v, comparator) end)
+end
+
+-- Returns the difference of two collections, using a property accessor
+function _exceptby(self, property, other)
+	other = from(other)
+	return self:where(function (v) return not other:contains(v[property]) end)
+end
+
+-- Returns the intersection of two collections, using a property accessor
+function _intersectionby(self, property, other)
+	other = from(other)
+	return self:where(function (v) return other:contains(v[property]) end)
 end
 

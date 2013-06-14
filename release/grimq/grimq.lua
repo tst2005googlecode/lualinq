@@ -16,11 +16,8 @@
 -- change this if you don't want all secrets to be "auto"
 AUTO_ALL_SECRETS = true
 
--- integrate with jkos framework. Read docs before enabling it.
-USE_JKOS_FRAMEWORK = false
-
 -- how much log information is printed: 3 => verbose, 2 => info, 1 => only warning and errors, 0 => only errors, -1 => silent
-LOG_LEVEL = 0
+LOG_LEVEL = 1
 
 -- prefix for the printed logs
 LOG_PREFIX = "GrimQ: "
@@ -40,8 +37,12 @@ CONTAINERITEM_MAXSLOTS = 10
 -- DEBUG TRACER
 -- ============================================================
 
-LIB_VERSION_TEXT = "1.4.3"
-LIB_VERSION = 143
+LIB_VERSION_TEXT = "1.5.1"
+LIB_VERSION = 151
+
+function setLogLevel(level)
+	LOG_LEVEL = level;
+end
 
 function _log(level, prefix, text)
 	if (level <= LOG_LEVEL) then
@@ -51,27 +52,33 @@ end
 
 function logq(self, method)
 	if (LOG_LEVEL >= 3) then
-		local items = #self.m_Data
-		local dumpdata = "{ "
-		
-		for i = 1, 3 do
-			if (i <= items) then
-				if (i ~= 1) then
-					dumpdata = dumpdata .. ", "
-				end
-				dumpdata = dumpdata .. tostring(self.m_Data[i])
-			end
-		end
-		
-		if (items > 3) then
-			dumpdata = dumpdata .. ", ... }"
-		else
-			dumpdata = dumpdata .. " }"
-		end
-	
-		logv("after " .. method .. " => " .. items .. " items : " .. dumpdata)
+		logv("after " .. method .. " => " .. #self.m_Data .. " items : " .. _dumpData(self))
 	end
 end
+
+function _dumpData(self)
+	local items = #self.m_Data
+	local dumpdata = "q{ "
+	
+	for i = 1, 3 do
+		if (i <= items) then
+			if (i ~= 1) then
+				dumpdata = dumpdata .. ", "
+			end
+			dumpdata = dumpdata .. tostring(self.m_Data[i])
+		end
+	end
+	
+	if (items > 3) then
+		dumpdata = dumpdata .. ", ..." .. items .. " }"
+	else
+		dumpdata = dumpdata .. " }"
+	end
+
+	return dumpdata
+end
+
+
 
 function logv(txt)
 	_log(3, "[..] ", txt)
@@ -98,7 +105,7 @@ end
 function _new_lualinq(method, collection)
 	local self = { }
 	
-	self.classid_71cd970f_a742_4316_938d_1998df001335 = 1
+	self.classid_71cd970f_a742_4316_938d_1998df001335 = 2
 	
 	self.m_Data = collection
 	
@@ -115,6 +122,10 @@ function _new_lualinq(method, collection)
 	self.union = _union
 	self.except = _except
 	self.intersection = _intersection
+	self.exceptby = _exceptby
+	self.intersectionby = _intersectionby
+	self.exceptBy = _exceptby
+	self.intersectionBy = _intersectionby
 
 	self.first = _first
 	self.last = _last
@@ -130,6 +141,8 @@ function _new_lualinq(method, collection)
 	self.sum = _sum
 	self.average = _average
 
+	self.dump = _dump
+	
 	self.map = _map
 	self.foreach = _foreach
 	self.xmap = _xmap
@@ -137,6 +150,14 @@ function _new_lualinq(method, collection)
 	self.toArray = _toArray
 	self.toDictionary = _toDictionary
 	self.toIterator = _toIterator
+	self.toTuple = _toTuple
+
+	-- shortcuts
+	self.each = _foreach
+	self.intersect = _intersection
+	self.intersectby = _intersectionby
+	self.intersectBy = _intersectionby
+	
 	
 	logq(self, "from")
 
@@ -220,6 +241,18 @@ function fromIteratorsArray(iteratorArray)
 	return _new_lualinq("fromIteratorsArray", collection)
 end
 
+-- Creates a linq data structure from a table of keys, values ignored
+function fromSet(set)
+	local collection = { }
+
+	for k,v in pairs(set) do
+		table.insert(collection, k)
+	end
+	
+	return _new_lualinq("fromIteratorsArray", collection)
+end
+
+
 -- Creates an empty linq data structure
 function fromNothing()
 	return _new_lualinq("fromNothing", { } )
@@ -254,15 +287,16 @@ function _select(self, selector)
 				table.insert(result, newvalue)
 			end
 		end
-	else 
+	elseif (type(selector) == "string") then
 		for idx, value in ipairs(self.m_Data) do
 			local newvalue = value[selector]
 			if (newvalue ~= nil) then
 				table.insert(result, newvalue)
 			end
 		end
-	end
-	
+	else
+		loge("select called with unknown predicate type");
+	end	
 	return _new_lualinq(":select", result)
 end
 
@@ -285,26 +319,45 @@ function _selectMany(self, selector)
 	return _new_lualinq(":selectMany", result)
 end
 
+
 -- Returns a linq data structure where only items for whose the predicate has returned true are included
-function _where(self, predicate, refvalue)
+function _where(self, predicate, refvalue, ...)
 	local result = { }
 
 	if (type(predicate) == "function") then
 		for idx, value in ipairs(self.m_Data) do
-			if (predicate(value)) then
+			if (predicate(value, refvalue, from({...}):toTuple())) then
 				table.insert(result, value)
 			end
 		end	
-	else 
-		for idx, value in ipairs(self.m_Data) do
-			if (value[predicate] == refvalue) then
-				table.insert(result, value)
-			end
-		end	
+	elseif (type(predicate) == "string") then
+		local refvals = {...}
+		
+		if (#refvals > 0) then
+			table.insert(refvals, refvalue);
+			return _intersectionby(self, predicate, refvals);
+		elseif (refvalue ~= nil) then
+			for idx, value in ipairs(self.m_Data) do
+				if (value[predicate] == refvalue) then
+					table.insert(result, value)
+				end
+			end	
+		else
+			for idx, value in ipairs(self.m_Data) do
+				if (value[predicate] ~= nil) then
+					table.insert(result, value)
+				end
+			end	
+		end
+	else
+		loge("where called with unknown predicate type");
 	end
 	
 	return _new_lualinq(":where", result)
 end
+
+
+
 
 -- Returns a linq data structure where only items for whose the predicate has returned true are included, indexed version
 function _whereIndex(self, predicate)
@@ -386,6 +439,18 @@ function _intersection(self, other, comparator)
 	return self:where(function (v) return other:contains(v, comparator) end)
 end
 
+-- Returns the difference of two collections, using a property accessor
+function _exceptby(self, property, other)
+	other = from(other)
+	return self:where(function (v) return not other:contains(v[property]) end)
+end
+
+-- Returns the intersection of two collections, using a property accessor
+function _intersectionby(self, property, other)
+	other = from(other)
+	return self:where(function (v) return other:contains(v[property]) end)
+end
+
 -- ============================================================
 -- CONVERSION METHODS
 -- ============================================================
@@ -418,6 +483,14 @@ function _toDictionary(self, keyValueSelector)
 	
 	return result
 end
+
+-- Converts the lualinq struct to a tuple
+function _toTuple(self)
+	return unpack(self.m_Data)
+end
+
+
+
 
 -- ============================================================
 -- TERMINATING METHODS
@@ -482,6 +555,12 @@ function _count(self, predicate)
 	return false
 end
 
+
+-- Prints debug data.
+function _dump(self)
+	print(_dumpData(self));
+end
+
 -- Returns a random item in the collection, or default if no items are present
 function _random(self, default)
 	if (#self.m_Data == 0) then return default; end
@@ -501,11 +580,21 @@ function _contains(self, item, comparator)
 end
 
 
--- Calls the action for each item in the collection. Action takes 1 parameter: the item value
-function _foreach(self, action)
-	for idx, value in ipairs(self.m_Data) do
-		action(value)
+-- Calls the action for each item in the collection. Action takes 1 parameter: the item value.
+-- If the action is a string, it calls that method with the additional parameters
+function _foreach(self, action, ...)
+	if (type(action) == "function") then
+		for idx, value in ipairs(self.m_Data) do
+			action(value, from({...}):toTuple())
+		end
+	elseif (type(action) == "string") then
+		for idx, value in ipairs(self.m_Data) do
+			value[action](value, from({...}):toTuple())
+		end
+	else
+		loge("foreach called with unknown action type");
 	end
+
 	
 	return self
 end
@@ -569,6 +658,21 @@ function _average(self, selector)
 		return 0
 	end
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- ============================================================
 -- ENUMERATIONS
 -- ============================================================
@@ -605,6 +709,20 @@ facing =
 -- ============================================================
 -- LUALINQ GENERATORS
 -- ============================================================
+
+-- Returns a grimq structure filled with names of entities contained
+-- in one of the fw sets.
+function fromFwSet(listname, sublistname)
+	local set = fw.lists[listname];
+	
+	if (set ~= nil) and (sublistname ~= nil) then
+		set = set[sublistname];
+	end
+	
+	return fromSet(set);
+end
+
+
 
 -- Returns a grimq structure containing all champions
 function fromChampions()
@@ -737,10 +855,10 @@ function _createExtEntity(_slotnumber, _entity, _champion, _container, _ismouse,
 end
 
 function _appendContainerItem(collection, item, champion, containerslot)
-	print("appending contents of container " .. item.id)
+	--print("appending contents of container " .. item.id)
 	for j = 1, CONTAINERITEM_MAXSLOTS do
 		if (item:getItem(j) ~= nil) then
-			print("  appended " .. item:getItem(j).id)
+			--print("  appended " .. item:getItem(j).id)
 			table.insert(collection, _createExtEntity(j, item:getItem(j), champion, item, false, containerslot))
 			_appendContainerItem(collection, item:getItem(j), nil, j)
 		end
@@ -758,7 +876,8 @@ function fromChampionInventoryEx(champion, recurseIntoContainers, inventorySlots
 	end
 
 	local collection = { }
-	for i = 1, #inventorySlots do
+	for idx = 1, #inventorySlots do
+		local i = inventorySlots[idx];
 		local item = champion:getItem(i)
 		
 		if (item ~= nil) then
@@ -799,7 +918,7 @@ function fromPartyInventoryEx(recurseIntoContainers, inventorySlots, includeMous
 end
 
 -- Returns a grimq structure cotaining all the entities in the dungeon respecting a given *optional* condition
-function fromAllEntitiesInWorld(predicate, refvalue)
+function fromAllEntitiesInWorld(predicate, refvalue, ...)
 	local result = { }
 
 	if (predicate == nil) then
@@ -817,10 +936,26 @@ function fromAllEntitiesInWorld(predicate, refvalue)
 			end
 		end
 	else 
-		for lvl = 1, MAXLEVEL do
-			for value in fromAllEntities(lvl):toIterator() do
-				if (value[predicate] == refvalue) then
-					table.insert(result, value)
+		local refvals = {...}
+		
+		if (#refvals > 0) then
+			local refset = { }
+			for _, l in ipairs(refvals) do refset[l] = true; end
+			refset[refvalue] = true;
+		
+			for lvl = 1, MAXLEVEL do
+				for value in fromAllEntities(lvl):toIterator() do
+					if (refset[value[predicate]]) then
+						table.insert(result, value)
+					end
+				end
+			end
+		else
+			for lvl = 1, MAXLEVEL do
+				for value in fromAllEntities(lvl):toIterator() do
+					if (value[predicate] == refvalue) then
+						table.insert(result, value)
+					end
 				end
 			end
 		end
@@ -998,6 +1133,10 @@ end
 
 -- loads an item from the table
 function loadItem(itemTable, level, x, y, facing, id, restoresubids)
+	if (tonumber(id) ~= nil) then
+		id = nil
+	end
+
    local spitem = nil
    if (level ~= nil) then
 	  spitem = spawn(itemTable.name, level, x, y, facing, id)
@@ -1130,26 +1269,28 @@ function directionFromDelta(dx, dy)
 	else return 3; end
 end
 
-function find(id)
+function find(id, ignoreCornerCases)
 	local entity = findEntity(id)
 	if (entity ~= nil) then	return entity; end
 	
 	entity = fromPartyInventory(true, inventory.all, true):where("id", id):first()
 	if (entity ~= nil) then	return entity; end
 	
-	local containers = fromAllEntitiesInWorld(isItem)
-				:selectMany(function(i) return from(i:containedItems()):toArray(); end)
-	
-	entity = containers
-		:where(function(ii) return ii.id == id; end)
-		:first()
-	
-	if (entity ~= nil) then	return entity; end
+	if (not ignoreCornerCases) then
+		local containers = fromAllEntitiesInWorld(isItem)
+					:selectMany(function(i) return from(i:containedItems()):toArray(); end)
 		
-	entity = containers
-		:selectMany(function(i) return from(i:containedItems()):toArray(); end)
-		:where(function(ii) return ii.id == id; end)
-		:first()
+		entity = containers
+			:where(function(ii) return ii.id == id; end)
+			:first()
+	
+		if (entity ~= nil) then	return entity; end
+		
+		entity = containers
+			:selectMany(function(i) return from(i:containedItems()):toArray(); end)
+			:where(function(ii) return ii.id == id; end)
+			:first()
+	end
 		
 	return entity
 end
@@ -1339,9 +1480,61 @@ function decorateOver(level, nameOverWhich, listOfDecorations, useRandomNumbers)
 	end)
 end
 
+function partyDist(x, y)
+	return math.abs(party.x - x) + math.abs(party.y - y)
+end
 
 
+function spawnSmart(level, spawners, spawnedEntityNames, maxEntities, minDistance)
+	minDistance = minDistance or 7;
+	
+	local count = grimq.fromAllEntities(level)
+		:where(grimq.isMonster)
+		:intersectionby("name", spawnedEntityNames)
+		:count();
 
+	if count >= maxEntities then
+		return 0;
+	end
+	
+	local spawner = spawners[math.random(1, #spawners)]
+	
+	local dist = partyDist(spawner.x, spawner.y)
+	
+	if dist < minDistance then
+		return 0;
+	end
+	
+	spawner:activate()
+	return 1;
+end	
+	
+function replaceMonster(m, newname)
+	local x = m.x
+	local y = m.y
+	local f = m.facing
+	local l = m.level
+	local id = m.id
+	local hp = m:getHealth()
+	local lvl = m:getLevel()
+	
+	if (tonumber(id) ~= nil) then
+		id = nil
+	end
+	
+	if (hp > 0) then
+		m:destroy()
+		spawn(newname, l, x, y, f, id)
+			:setLevel(lvl)
+			:setHealth(hp)
+	end
+end
+
+function spawnOver(entity, spawnname, overridefacing)
+	local facing = overridefacing or entity.facing;
+	
+	spawn(spawnname, entity.level, entity.x, entity.y, facing);
+end
 
 
 
@@ -1403,6 +1596,16 @@ function strmatch(value, pattern)
 	return string.find(value, pattern) ~= nil
 end
 
+function strlines(str)
+	local count = 0 
+    local byte_char = string.byte("\n")
+    for i = 1, #str do
+        if string.byte(str, i) == byte_char then
+            count = count + 1 
+        end 
+    end 
+    return count + 1
+end
 
 -- ============================================================
 -- AUTO-OBJECTS
@@ -1521,25 +1724,75 @@ function _initializeAutoHooks(ntt)
 		logv("Executing autoexecfw of " .. ntt.id .. "...)")
 		ntt:autoexecfw();
 	end
+	
+	local autohook = ntt.autohook;
+	
+	if (autohook == nil) then
+		autohook = ntt.autohooks;
+	end
 
-	if (ntt.autohook ~= nil) then
+	if (autohook ~= nil) then
 		if (fw == nil) then
 			loge("_initializeAutoHooks called with nil fw ???.")
 			return
 		end
 
-		for hooktable in from(ntt.autohook):toIterator() do
+		for hooktable in from(autohook):toIterator() do
 			local target = hooktable.key
-			local hooks = from(hooktable.value):where(function(fn) return (type(fn.value) == "function"); end)
+			local hooks = from(hooktable.value)
 			
 			for hook in hooks:toIterator() do
 				local hookname = hook.key
-				logv("Adding hook for: ".. ntt.id .. "." .. hookname .. " ...")
-				fw.addHooks(target, ntt.id .. "_" .. target .. "_" .. hookname, { [hookname] = hook.value } )
+				local hookfn = hook.value
+				
+				if (type(hookfn) == "function") then
+					logi("Adding *DEPRECATED* hook for: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " ...")
+					fw.addHooks(target, ntt.id .. "_" .. target .. "_" .. hookname, { [hookname] = hook.value } )
+					logw("Hook: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " is a function -- *DEPRECATED* use.")
+				elseif (type(hookfn) == "string") then
+					_installAutoHook(ntt, hookname, target, {fn = hookfn});
+				elseif (type(hookfn) == "table") then
+					_installAutoHook(ntt, hookname, target, hookfn);
+				else
+					loge("Hook: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " is an unsupported type. Must be string or table.")
+				end
 			end
 		end
 	end
 end
+
+function _installAutoHook(ntt, hookname, target, hooktable)
+	local hookId = ntt.id .. "_" .. target .. "_" .. hookname;
+
+	logi("Adding hook for: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " ...")
+	
+	if (hooktable.vars == nil) then
+		hooktable.vars = { };
+	end
+
+	hooktable.vars._hook_entity = ntt.id;
+	hooktable.vars._hook_method = hooktable.fn;
+	
+	fw.setHookVars(target, hookId, hookname, hooktable.vars)
+	
+	fw.addHooks(target, hookId, 
+		{ 
+			[hookname] = function(p1, p2, p3, p4, p5, p6, p7, p8, p9)
+				local vars = fw.getHookVars();
+				local ntt = findEntity(vars._hook_entity);
+
+				if (ntt == nil) then
+					loge("Can't find entity ".. vars._hook_entity);
+				else
+					return ntt[vars._hook_method](p1, p2, p3, p4, p5, p6, p7, p8, p9);
+				end
+			end,
+		}
+		, hooktable.ordinal 
+	);
+end
+
+
 
 function _activateJKosFw()
 	fromAllEntitiesInWorld(isScript):foreach(_initializeAutoHooks)
@@ -1556,15 +1809,11 @@ function _banner()
 	logi("GrimQ Version " .. LIB_VERSION_TEXT .. VERSION_SUFFIX .. " - Marco Mastropaolo (Xanathar)")
 end
 
--- added by JKos
+-- added by JKos -- note: as of v1.5 grimq *REQUIRES* jkos fw.
 function activate()
-	if (USE_JKOS_FRAMEWORK) then
-		logi("Starting with jkos-fw bootstrap...")
-		grimq._activateAutos()
-		grimq._activateJKosFw()
-	else
-		loge("JKOS FRAMEWORK DETECTED! Please, enable USE_JKOS_FRAMEWORK at the top of grimq script!");
-	end
+	logi("Starting with jkos-fw bootstrap...")
+	grimq._activateAutos()
+	grimq._activateJKosFw()
 end
 
 _banner()
@@ -1573,16 +1822,6 @@ MAXLEVEL = getMaxLevels()
 
 if (isWall == nil) then
 	loge("This version of GrimQ requires Legend of Grimrock 1.3.6 or later!")
-elseif (not USE_JKOS_FRAMEWORK) then 
-	logi("Starting with standard bootstrap...")
-
-	spawn("pressure_plate_hidden", party.level, party.x, party.y, 0)
-		:setTriggeredByParty(true)
-		:setTriggeredByMonster(false)
-		:setTriggeredByItem(false)
-		:setActivateOnce(true)
-		:setSilent(true)
-		:addConnector("activate", "grimq", "_activateAutos")
 end
 
 

@@ -115,25 +115,75 @@ function _initializeAutoHooks(ntt)
 		logv("Executing autoexecfw of " .. ntt.id .. "...)")
 		ntt:autoexecfw();
 	end
+	
+	local autohook = ntt.autohook;
+	
+	if (autohook == nil) then
+		autohook = ntt.autohooks;
+	end
 
-	if (ntt.autohook ~= nil) then
+	if (autohook ~= nil) then
 		if (fw == nil) then
 			loge("_initializeAutoHooks called with nil fw ???.")
 			return
 		end
 
-		for hooktable in from(ntt.autohook):toIterator() do
+		for hooktable in from(autohook):toIterator() do
 			local target = hooktable.key
-			local hooks = from(hooktable.value):where(function(fn) return (type(fn.value) == "function"); end)
+			local hooks = from(hooktable.value)
 			
 			for hook in hooks:toIterator() do
 				local hookname = hook.key
-				logv("Adding hook for: ".. ntt.id .. "." .. hookname .. " ...")
-				fw.addHooks(target, ntt.id .. "_" .. target .. "_" .. hookname, { [hookname] = hook.value } )
+				local hookfn = hook.value
+				
+				if (type(hookfn) == "function") then
+					logi("Adding *DEPRECATED* hook for: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " ...")
+					fw.addHooks(target, ntt.id .. "_" .. target .. "_" .. hookname, { [hookname] = hook.value } )
+					logw("Hook: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " is a function -- *DEPRECATED* use.")
+				elseif (type(hookfn) == "string") then
+					_installAutoHook(ntt, hookname, target, {fn = hookfn});
+				elseif (type(hookfn) == "table") then
+					_installAutoHook(ntt, hookname, target, hookfn);
+				else
+					loge("Hook: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " is an unsupported type. Must be string or table.")
+				end
 			end
 		end
 	end
 end
+
+function _installAutoHook(ntt, hookname, target, hooktable)
+	local hookId = ntt.id .. "_" .. target .. "_" .. hookname;
+
+	logi("Adding hook for: ".. ntt.id .. "." .. hookname .. " for target " .. target .. " ...")
+	
+	if (hooktable.vars == nil) then
+		hooktable.vars = { };
+	end
+
+	hooktable.vars._hook_entity = ntt.id;
+	hooktable.vars._hook_method = hooktable.fn;
+	
+	fw.setHookVars(target, hookId, hookname, hooktable.vars)
+	
+	fw.addHooks(target, hookId, 
+		{ 
+			[hookname] = function(p1, p2, p3, p4, p5, p6, p7, p8, p9)
+				local vars = fw.getHookVars();
+				local ntt = findEntity(vars._hook_entity);
+
+				if (ntt == nil) then
+					loge("Can't find entity ".. vars._hook_entity);
+				else
+					return ntt[vars._hook_method](p1, p2, p3, p4, p5, p6, p7, p8, p9);
+				end
+			end,
+		}
+		, hooktable.ordinal 
+	);
+end
+
+
 
 function _activateJKosFw()
 	fromAllEntitiesInWorld(isScript):foreach(_initializeAutoHooks)

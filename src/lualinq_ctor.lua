@@ -6,7 +6,7 @@
 function _new_lualinq(method, collection)
 	local self = { }
 	
-	self.classid_71cd970f_a742_4316_938d_1998df001335 = 1
+	self.classid_71cd970f_a742_4316_938d_1998df001335 = 2
 	
 	self.m_Data = collection
 	
@@ -23,6 +23,10 @@ function _new_lualinq(method, collection)
 	self.union = _union
 	self.except = _except
 	self.intersection = _intersection
+	self.exceptby = _exceptby
+	self.intersectionby = _intersectionby
+	self.exceptBy = _exceptby
+	self.intersectionBy = _intersectionby
 
 	self.first = _first
 	self.last = _last
@@ -38,6 +42,8 @@ function _new_lualinq(method, collection)
 	self.sum = _sum
 	self.average = _average
 
+	self.dump = _dump
+	
 	self.map = _map
 	self.foreach = _foreach
 	self.xmap = _xmap
@@ -45,6 +51,14 @@ function _new_lualinq(method, collection)
 	self.toArray = _toArray
 	self.toDictionary = _toDictionary
 	self.toIterator = _toIterator
+	self.toTuple = _toTuple
+
+	-- shortcuts
+	self.each = _foreach
+	self.intersect = _intersection
+	self.intersectby = _intersectionby
+	self.intersectBy = _intersectionby
+	
 	
 	logq(self, "from")
 
